@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app.auth.router import router as auth_router
 from app.routers.gallery import router as gallery_router
 from app.routers.health import router as health_router
 from app.routers.image import router as image_router
@@ -40,6 +41,7 @@ def register_routes(app: FastAPI) -> None:
         }
 
     app.include_router(health_router, prefix=API_PREFIX)
+    app.include_router(auth_router, prefix=API_PREFIX)
     app.include_router(image_router, prefix=API_PREFIX)
     app.include_router(journal_router, prefix=API_PREFIX)
     app.include_router(profile_router, prefix=API_PREFIX)

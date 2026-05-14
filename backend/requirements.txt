@@ -6,6 +6,10 @@ exifread
 python-dotenv
 sqlalchemy
 psycopg[binary]
+alembic
+passlib[bcrypt]
+python-jose[cryptography]
+pydantic[email]
 torch
 transformers
 openai
