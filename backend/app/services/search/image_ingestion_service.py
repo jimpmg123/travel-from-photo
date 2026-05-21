@@ -28,12 +28,19 @@ def extract_image_metadata_payload(
     *,
     include_path: bool = True,
     db: Session | None = None,
+    user_id: int | None = None,
+    search_session_id: int | None = None,
 ) -> dict[str, Any]:
     metadata = extract_image_metadata(image_path)
     payload = enrich_metadata_case(metadata, include_path=include_path)
 
     if db is not None:
-        saved_row = create_image_metadata(db, payload)
+        saved_row = create_image_metadata(
+            db,
+            payload,
+            user_id=user_id,
+            search_session_id=search_session_id,
+        )
         payload["database_id"] = saved_row.id
 
     return payload

@@ -64,6 +64,12 @@ class SearchImageAnalysis:
     landmark_candidate: dict[str, Any] | None = None
     openai_candidate: dict[str, Any] | None = None
     hint_context: dict[str, Any] = field(default_factory=dict)
+    # Fusion-flow additions. Each signal is one helper's raw answer + parsed
+    # fields; each candidate is one place that one or more signals agree on.
+    signals: list[dict[str, Any]] = field(default_factory=list)
+    candidates: list[dict[str, Any]] = field(default_factory=list)
+    verdict: str | None = None
+    preprocessing: dict[str, Any] = field(default_factory=dict)
 
     def apply_resolution(self, resolution: SearchLocationResolution) -> None:
         self.resolution_status = resolution.status

@@ -6,34 +6,21 @@ from tempfile import NamedTemporaryFile
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
-from app.services.search.clip_search_service import analyze_search_clip
-from app.services.search.contracts import SearchHintContext, SearchImageAnalysis, SearchLocationResolution
-from app.services.search.hint_validation_service import country_matches_hint
+from app.repositories.search_repository import create_search_session, persist_analysis_run
+from app.services.search.candidate_normalizer_service import normalize_signals_to_candidates
+from app.services.search.candidate_scorer_service import score_and_rank
+from app.services.search.contracts import (
+    SearchHintContext,
+    SearchImageAnalysis,
+    SearchLocationResolution,
+)
+from app.services.search.hint_reweighting_service import reweight_candidates
 from app.services.search.image_ingestion_service import extract_image_metadata_payload
-from app.services.search.landmark_search_service import resolve_location_from_landmark
-from app.services.search.openai_search_service import resolve_location_with_openai
-from app.services.shared.geocoding_service import reverse_geocode_coordinates
+from app.services.search.signal_collector_service import build_exif_gps_signal, collect_signals
+from app.services.shared.image_preprocessing_service import preprocess_image
 
 
-def _build_failed_resolution(reason: str, *, source: str | None = None) -> SearchLocationResolution:
-    return SearchLocationResolution(
-        status="failed",
-        source=source,
-        latitude=None,
-        longitude=None,
-        formatted_address=None,
-        country=None,
-        city=None,
-        region=None,
-        failure_reason=reason,
-    )
-
-
-def _build_analysis_from_metadata(
-    metadata: dict,
-    *,
-    hints: SearchHintContext,
-) -> SearchImageAnalysis:
+def _build_analysis_from_metadata(metadata: dict, *, hints: SearchHintContext) -> SearchImageAnalysis:
     return SearchImageAnalysis(
         file_name=metadata["file_name"],
         absolute_path=metadata.get("absolute_path"),
@@ -43,52 +30,61 @@ def _build_analysis_from_metadata(
         camera=metadata.get("camera") or {},
         gps=metadata.get("gps"),
         has_gps=bool(metadata.get("gps")),
-        metadata_case=str(metadata.get("metadata_case") or ("gps_present" if metadata.get("gps") else "gps_missing")),
+        metadata_case=str(
+            metadata.get("metadata_case") or ("gps_present" if metadata.get("gps") else "gps_missing")
+        ),
         exif_summary=metadata.get("exif_summary") or {},
         hint_context={
             "country_hint": hints.normalized_country(),
             "city_hint": hints.normalized_city(),
+            "user_hint": hints.normalized_user_hint(),
         },
     )
 
 
-def _resolve_from_exif_gps(
-    gps: dict,
-    *,
-    hints: SearchHintContext,
-) -> SearchLocationResolution:
-    latitude = gps.get("latitude")
-    longitude = gps.get("longitude")
-    if latitude is None or longitude is None:
-        return _build_failed_resolution("EXIF GPS payload is incomplete.", source="exif_gps")
+def _apply_top_candidate(analysis: SearchImageAnalysis, verdict: str) -> None:
+    """Project the rank-1 candidate onto the legacy resolution fields so
+    older frontend code (which reads resolved_*, city, etc.) keeps working
+    while we also publish the new signals/candidates/verdict."""
 
-    try:
-        geocoded = reverse_geocode_coordinates(latitude, longitude, language_code="en")
-    except Exception as exc:
-        return SearchLocationResolution(
-            status="resolved",
-            source="exif_gps",
-            latitude=latitude,
-            longitude=longitude,
-            formatted_address=None,
-            country=None,
-            city=None,
-            region=None,
-            failure_reason=f"Reverse geocoding skipped: {exc}",
+    if not analysis.candidates:
+        analysis.apply_resolution(
+            SearchLocationResolution(
+                status="failed",
+                source="signal_fusion",
+                latitude=None,
+                longitude=None,
+                formatted_address=None,
+                country=None,
+                city=None,
+                region=None,
+                failure_reason="No candidates produced from any signal.",
+            )
         )
+        analysis.city = "Unknown Location"
+        return
 
-    metadata = {"hint_country_match": country_matches_hint(geocoded.get("country"), hints)}
-    return SearchLocationResolution(
-        status="resolved",
-        source="exif_gps",
-        latitude=latitude,
-        longitude=longitude,
-        formatted_address=geocoded.get("formatted_address"),
-        country=geocoded.get("country"),
-        city=geocoded.get("city"),
-        region=geocoded.get("region"),
-        metadata=metadata,
+    top = analysis.candidates[0]
+    status = "resolved" if verdict in {"confident", "likely"} else "suggestions"
+    analysis.apply_resolution(
+        SearchLocationResolution(
+            status=status,
+            source="signal_fusion",
+            latitude=top.get("latitude"),
+            longitude=top.get("longitude"),
+            formatted_address=top.get("formatted_address"),
+            country=top.get("country"),
+            city=top.get("city"),
+            region=None,
+            place_name=top.get("place_name"),
+            metadata={
+                "contributing_sources": top.get("contributing_sources"),
+                "aggregated_score": top.get("aggregated_score"),
+                "verdict": verdict,
+            },
+        )
     )
+    analysis.city = top.get("city") or "Unknown Location"
 
 
 async def analyze_uploaded_search_image(
@@ -97,12 +93,25 @@ async def analyze_uploaded_search_image(
     country_hint: str | None = None,
     city_hint: str | None = None,
     user_hint: str | None = None,
-    force_openai_retry: bool = False,
+    force_openai_retry: bool = False,  # accepted for backward compat; fusion always runs all signals
     db: Session | None = None,
+    user_id: int | None = None,
 ) -> SearchImageAnalysis:
+    """Signal fusion flow:
+    1. Persist upload (UploadedImage + ImageExifMetadata) and start a SearchSession.
+    2. Preprocess the image (rotation, resize, autocontrast).
+    3. Build the EXIF GPS signal if present, then fan out 7 external signals in parallel.
+    4. Normalize signals into candidates via Places/Geocoding.
+    5. Score per-source priors and compute the verdict.
+    6. Re-weight by user hints (country/city/text), re-rank, recompute verdict.
+    7. Persist the run + N signals + N candidates."""
+
+    del force_openai_retry  # cascade-era param; fusion ignores it
+
     suffix = Path(file.filename or "upload.bin").suffix
     hints = SearchHintContext(country_hint=country_hint, city_hint=city_hint, user_hint=user_hint)
     temp_path: Path | None = None
+    processed_path: Path | None = None
 
     try:
         with NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
@@ -110,74 +119,53 @@ async def analyze_uploaded_search_image(
             temp_file.write(content)
             temp_path = Path(temp_file.name)
 
-        metadata = extract_image_metadata_payload(temp_path, include_path=False, db=db)
+        session = create_search_session(db, hints=hints, user_id=user_id) if db else None
+        session_id = session.id if session else None
+
+        metadata = extract_image_metadata_payload(
+            temp_path,
+            include_path=False,
+            db=db,
+            user_id=user_id,
+            search_session_id=session_id,
+        )
         metadata["file_name"] = file.filename or metadata["file_name"]
         analysis = _build_analysis_from_metadata(metadata, hints=hints)
 
         try:
-            clip_result = analyze_search_clip(temp_path)
-            analysis.summary = clip_result.get("summary")
-            analysis.clip_gate = clip_result.get("gate")
-            analysis.clip_scene_hints = clip_result.get("scene_hints") or []
+            preprocess_result = preprocess_image(temp_path)
+            analysis.preprocessing = preprocess_result
+            processed_path = Path(preprocess_result["processed_path"])
         except Exception as exc:
-            analysis.summary = f"CLIP analysis failed: {exc}"
+            analysis.preprocessing = {"applied": [], "error": str(exc)}
+            processed_path = temp_path
 
-        if analysis.has_gps and analysis.gps:
-            resolution = _resolve_from_exif_gps(analysis.gps, hints=hints)
-            analysis.apply_resolution(resolution)
-            return analysis
+        exif_signal = build_exif_gps_signal(analysis.gps)
+        external_signals = await collect_signals(processed_path, hints=hints, user_hint=user_hint)
+        analysis.signals = ([exif_signal] if exif_signal else []) + list(external_signals)
 
-        if (
-            analysis.clip_gate
-            and not analysis.clip_gate.get("is_location_candidate")
-            and not force_openai_retry
-        ):
-            analysis.apply_resolution(
-                _build_failed_resolution(
-                    analysis.clip_gate.get("reason")
-                    or "CLIP gate rejected the image for location inference.",
-                    source="clip_gate",
-                )
-            )
-            analysis.city = "Unknown Location"
-            return analysis
+        candidates = await normalize_signals_to_candidates(analysis.signals)
+        scored, _ = score_and_rank(candidates)
+        final, verdict = reweight_candidates(scored, hints=hints, same_session_gps_cluster=None)
+        analysis.candidates = final
+        analysis.verdict = verdict
 
-        if not force_openai_retry:
+        _apply_top_candidate(analysis, verdict)
+
+        if db is not None and metadata.get("database_id") is not None:
             try:
-                landmark_resolution, top_landmark = resolve_location_from_landmark(temp_path, hints=hints)
-                analysis.landmark_candidate = top_landmark
-                if landmark_resolution and landmark_resolution.status == "resolved":
-                    analysis.apply_resolution(landmark_resolution)
-                    return analysis
-                if landmark_resolution and landmark_resolution.failure_reason:
-                    analysis.failure_reason = landmark_resolution.failure_reason
-            except Exception as exc:
-                analysis.failure_reason = f"Landmark detection failed: {exc}"
+                persist_analysis_run(
+                    db,
+                    analysis=analysis,
+                    image_id=metadata["database_id"],
+                    search_session_id=session_id,
+                )
+            except Exception:
+                db.rollback()  # search must still return even if persistence fails
 
-        try:
-            openai_resolution, openai_candidate = resolve_location_with_openai(
-                temp_path,
-                hints=hints,
-                user_hint=user_hint,
-            )
-            analysis.openai_candidate = openai_candidate
-            if openai_resolution and openai_resolution.status == "resolved":
-                analysis.apply_resolution(openai_resolution)
-                return analysis
-            if openai_resolution and openai_resolution.failure_reason:
-                analysis.failure_reason = openai_resolution.failure_reason
-        except Exception as exc:
-            analysis.failure_reason = f"OpenAI location inference failed: {exc}"
-
-        analysis.apply_resolution(
-            _build_failed_resolution(
-                analysis.failure_reason
-                or "No location candidate could be resolved from EXIF, landmark detection, or OpenAI.",
-                source="search_pipeline",
-            )
-        )
-        analysis.city = "Unknown Location"
         return analysis
     finally:
         if temp_path and temp_path.exists():
             temp_path.unlink(missing_ok=True)
+        if processed_path and processed_path != temp_path and processed_path.exists():
+            processed_path.unlink(missing_ok=True)
