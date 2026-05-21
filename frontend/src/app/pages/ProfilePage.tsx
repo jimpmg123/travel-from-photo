@@ -1,16 +1,16 @@
 import { adminQueue, profileNotes } from '../data'
 import { SectionIntro } from '../components/SectionIntro'
 import { WorkflowList } from '../components/WorkflowList'
-import type { MockAccount, Role } from '../types'
+import type { AuthUser, Role } from '../types'
 
 type ProfilePageProps = {
-  account: MockAccount
+  user: AuthUser | null
   isLoggedIn: boolean
   role: Role
 }
 
-export function ProfilePage({ account, isLoggedIn, role }: ProfilePageProps) {
-  const displayName = `${account.firstName} ${account.lastName}`.trim()
+export function ProfilePage({ user, isLoggedIn, role }: ProfilePageProps) {
+  const displayName = user ? `${user.firstName} ${user.lastName}`.trim() : 'Guest'
 
   return (
     <div className="stack-xl">
@@ -28,20 +28,20 @@ export function ProfilePage({ account, isLoggedIn, role }: ProfilePageProps) {
       <section className="profile-grid">
         <article className="panel profile-card">
           <div className="avatar-ring">
-            <span>{`${account.firstName[0] ?? ''}${account.lastName[0] ?? ''}`}</span>
+            <span>{user ? `${user.firstName[0] ?? ''}${user.lastName[0] ?? ''}` : '?'}</span>
           </div>
           <div>
             <h3>{displayName}</h3>
             <p className="muted-copy">
-              {isLoggedIn
-                ? 'Signed in with a mock secure session.'
-                : 'Browsing in guest preview mode.'}
+              {isLoggedIn ? 'Signed in.' : 'Browsing in guest preview mode.'}
             </p>
           </div>
-          <div className="summary-list">
-            <span>ID: {account.userId}</span>
-            <span>Email: {account.email}</span>
-          </div>
+          {user && (
+            <div className="summary-list">
+              <span>ID: {user.userId}</span>
+              <span>Email: {user.email}</span>
+            </div>
+          )}
           <div className="badge-row">
             <span className="pill">{role === 'traveler' ? 'Traveler' : 'Admin'} view</span>
             <span className="pill">{isLoggedIn ? 'Gallery enabled' : 'Gallery locked'}</span>

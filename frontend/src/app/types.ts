@@ -1,16 +1,15 @@
 export type PageId =
+  | 'home'
   | 'search'
   | 'search-results'
-  | 'travelize-1'
-  | 'travelize-2'
-  | 'travelize-3'
-  | 'travelize-4'
   | 'gallery'
   | 'profile'
   | 'sign-in'
   | 'create-account'
   | 'images'
-  | 'journal';
+  | 'live-chat'
+  | 'journal'
+  | 'settings';
 
 export type PageNavigator = (page: PageId) => void
 
@@ -50,6 +49,14 @@ export type MockAccount = {
   userId: string
   email: string
   password: string
+}
+
+export type AuthUser = {
+  userId: string
+  firstName: string
+  lastName: string
+  email: string
+  role: Role
 }
 
 export type AuthResult = {

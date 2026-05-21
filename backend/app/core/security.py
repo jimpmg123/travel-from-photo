@@ -1,4 +1,7 @@
+import warnings
 from datetime import datetime, timedelta
+
+warnings.filterwarnings("ignore", ".*truncate.*")
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext

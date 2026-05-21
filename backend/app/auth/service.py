@@ -106,4 +106,7 @@ def login_user(db: Session, email: str, password: str) -> TokenResponse:
         token_type="bearer",
         user_id=user.user_id,
         role=user.role,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        email=user.email,
     )
