@@ -1,5 +1,3 @@
-import type { PageId } from '../types'
-
 export type UploadState = {
   fileName: string
   error: string
@@ -115,12 +113,10 @@ export type SearchResultBundle = {
 
 export type SearchPageProps = {
   onRunSearch: (session: SearchRun) => void
-  onOpenPage: (page: PageId) => void
 }
 
 export type SearchResultsPageProps = {
   isLoggedIn: boolean
   searchSession: SearchRun | null
-  onOpenPage: (page: PageId) => void
   onRetryFailedImage: (uploadId: string, userHint: string) => Promise<void>
 }

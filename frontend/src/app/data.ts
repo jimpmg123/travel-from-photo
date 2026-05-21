@@ -8,15 +8,11 @@ import type {
 } from './types'
 
 export const navItems: NavItem[] = [
-  { id: 'search', label: 'Search', hint: 'travel-photo intake' },
-  { id: 'travelize-1', label: 'Travelize', hint: 'itinerary builder' },
-  { id: 'gallery', label: 'Gallery', hint: 'my uploads' },
-  { id: 'profile', label: 'Profile', hint: 'account + settings' },
-  {
-    id: 'journal',
-    label: 'Journal',
-    hint: 'Generate Travel Log'
-  }
+  { id: 'home',      label: 'Home',     hint: 'search travel photos' },
+  { id: 'journal',   label: 'Journal',  hint: 'generate travel log' },
+  { id: 'gallery',   label: 'Gallery',  hint: 'my uploads' },
+  { id: 'live-chat', label: 'Chat',     hint: 'live chat among users' },
+  { id: 'settings',  label: 'Settings', hint: 'account & preferences' },
 ]
 
 export const metrics: Metric[] = [

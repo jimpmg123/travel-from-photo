@@ -1,22 +1,21 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { SearchResultMap } from './SearchResultMap'
-import type { PageNavigator } from '../../types'
 import type { SearchResultBundle } from '../types'
 
 type SearchResultsProps = {
   bundle: SearchResultBundle
   isLoggedIn: boolean
-  onOpenPage: PageNavigator
   onRetryFailedImage: (uploadId: string, userHint: string) => Promise<void>
 }
 
 export function SearchResults({
   bundle,
   isLoggedIn,
-  onOpenPage,
   onRetryFailedImage,
 }: SearchResultsProps) {
+  const navigate = useNavigate()
   const [retryHints, setRetryHints] = useState<Record<string, string>>({})
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const mappedResults = bundle.results.filter(
@@ -50,7 +49,7 @@ export function SearchResults({
           <button
             type="button"
             className="button-secondary save-gallery-button"
-            onClick={() => onOpenPage('gallery')}
+            onClick={() => navigate('/gallery')}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -214,15 +213,15 @@ export function SearchResults({
       </div>
 
       <div className="search-results-footer">
-        <button type="button" className="button-secondary" onClick={() => onOpenPage('search')}>
+        <button type="button" className="button-secondary" onClick={() => navigate('/')}>
           Back to search
         </button>
         {!isLoggedIn ? (
-          <button type="button" className="button-secondary" onClick={() => onOpenPage('sign-in')}>
+          <button type="button" className="button-secondary" onClick={() => navigate('/sign-in')}>
             Sign in to save this result
           </button>
         ) : (
-          <button type="button" className="button-secondary" onClick={() => onOpenPage('gallery')}>
+          <button type="button" className="button-secondary" onClick={() => navigate('/gallery')}>
             Open Gallery history
           </button>
         )}

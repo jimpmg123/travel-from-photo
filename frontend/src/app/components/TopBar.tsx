@@ -1,61 +1,61 @@
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   BookText,
   Camera,
-  ClipboardList,
   Image as ImageIcon,
   type LucideIcon,
+  MessageCircle,
+  Search,
+  Settings,
   User,
-  Wand2,
 } from 'lucide-react'
 
+import { useAuth } from '../context/AuthContext'
 import { navItems } from '../data'
-import type { PageId, Role } from '../types'
 
-type TopBarProps = {
-  activePage: PageId
-  isLoggedIn: boolean
-  isPending: boolean
-  role: Role
-  userDisplayName: string
-  onOpenPage: (page: PageId) => void
-  onOpenUserPage: () => void
-  onLogout: () => void
-  onToggleRole: () => void
-  onToggleLogin: () => void
+const navPath: Record<string, string> = {
+  home: '/',
+  journal: '/journal',
+  gallery: '/gallery',
+  'live-chat': '/chat',
+  settings: '/settings',
 }
 
-export function TopBar({
-  activePage,
-  isLoggedIn,
-  isPending,
-  role,
-  userDisplayName,
-  onOpenPage,
-  onOpenUserPage,
-  onLogout,
-  onToggleRole,
-  onToggleLogin,
-}: TopBarProps) {
-  const navActivePage =
-    activePage === 'search-results'
-      ? 'search'
-      : activePage === 'travelize-2' || activePage === 'travelize-3' || activePage === 'travelize-4'
-        ? 'travelize-1'
-        : activePage
+const navIcons: Record<string, LucideIcon> = {
+  home: Search,
+  journal: BookText,
+  gallery: ImageIcon,
+  'live-chat': MessageCircle,
+  settings: Settings,
+}
 
-  const primaryNavItems = navItems.filter((item) => item.id !== 'profile')
+function getActiveNavId(pathname: string): string {
+  if (pathname === '/' || pathname === '/search-results') return 'home'
+  if (pathname.startsWith('/gallery')) return 'gallery'
+  if (pathname === '/journal') return 'journal'
+  if (pathname === '/chat') return 'live-chat'
+  if (pathname === '/settings') return 'settings'
+  return ''
+}
 
-  const mobileNavIcons: Record<string, LucideIcon> = {
-    search: ClipboardList,
-    'travelize-1': Wand2,
-    gallery: ImageIcon,
-    journal: BookText,
+type TopBarProps = {
+  onLogout: () => void
+}
+
+export function TopBar({ onLogout }: TopBarProps) {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { isLoggedIn, role, userDisplayName } = useAuth()
+  const activeNavId = getActiveNavId(location.pathname)
+
+  const openUserPage = () => {
+    navigate(isLoggedIn ? '/profile' : '/sign-in')
   }
 
   return (
     <>
       <header className="topbar" aria-label="Application header">
-        <button type="button" className="brand-anchor" onClick={() => onOpenPage('search')}>
+        <button type="button" className="brand-anchor" onClick={() => navigate('/')}>
           <span className="brand-anchor-icon" aria-hidden="true">
             <Camera />
           </span>
@@ -65,24 +65,34 @@ export function TopBar({
         </button>
 
         <div className="topbar-tools">
-          {isPending ? <span className="pending-badge">Switching view...</span> : null}
-
-          <button type="button" className="topbar-chip" onClick={onToggleRole}>
-            {role === 'traveler' ? 'Traveler' : 'Admin'}
-          </button>
+          {isLoggedIn ? (
+            <>
+              {role === 'admin' && (
+                <span className="topbar-chip">Admin</span>
+              )}
+              <span className="topbar-username">{userDisplayName}</span>
+              <button
+                type="button"
+                className="topbar-chip topbar-chip--accent"
+                onClick={onLogout}
+              >
+                Sign out
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="topbar-chip topbar-chip--accent"
+              onClick={() => navigate('/sign-in')}
+            >
+              Sign in
+            </button>
+          )}
 
           <button
             type="button"
-            className="topbar-chip topbar-chip--accent"
-            onClick={isLoggedIn ? onLogout : onToggleLogin}
-          >
-            {isLoggedIn ? 'Sign out' : 'Sign in'}
-          </button>
-
-          <button
-            type="button"
-            className={`topbar-profile ${activePage === 'profile' ? 'is-active' : ''}`}
-            onClick={onOpenUserPage}
+            className={`topbar-profile ${location.pathname === '/profile' ? 'is-active' : ''}`}
+            onClick={openUserPage}
             aria-label={isLoggedIn ? `Open profile for ${userDisplayName}` : 'Open sign-in page'}
             title={isLoggedIn ? userDisplayName : 'Sign in'}
           >
@@ -92,14 +102,14 @@ export function TopBar({
       </header>
 
       <nav className="desktop-side-nav" aria-label="Primary desktop">
-        {primaryNavItems.map((item) => {
-          const Icon = mobileNavIcons[item.id]
+        {navItems.map((item) => {
+          const Icon = navIcons[item.id]
           return (
             <button
               key={item.id}
               type="button"
-              className={`desktop-side-button ${navActivePage === item.id ? 'is-active' : ''}`}
-              onClick={() => onOpenPage(item.id)}
+              className={`desktop-side-button ${activeNavId === item.id ? 'is-active' : ''}`}
+              onClick={() => navigate(navPath[item.id] ?? '/')}
               aria-label={item.label}
               title={item.label}
             >
@@ -111,14 +121,14 @@ export function TopBar({
       </nav>
 
       <nav className="mobile-bottom-nav" aria-label="Mobile primary">
-        {primaryNavItems.map((item) => {
-          const Icon = mobileNavIcons[item.id]
+        {navItems.map((item) => {
+          const Icon = navIcons[item.id]
           return (
             <button
               key={item.id}
               type="button"
-              className={`mobile-nav-button ${navActivePage === item.id ? 'is-active' : ''}`}
-              onClick={() => onOpenPage(item.id)}
+              className={`mobile-nav-button ${activeNavId === item.id ? 'is-active' : ''}`}
+              onClick={() => navigate(navPath[item.id] ?? '/')}
               aria-label={item.label}
             >
               {Icon ? <Icon className="mobile-nav-icon" /> : null}

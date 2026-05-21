@@ -1,11 +1,11 @@
+import { useNavigate } from 'react-router-dom'
 import { PhotoCard } from '../components/PhotoCard'
 import { SectionIntro } from '../components/SectionIntro'
-import type { GalleryGroup, PageId } from '../types'
+import type { GalleryGroup } from '../types'
 
 type GalleryPageProps = {
   groups: GalleryGroup[]
   isLoggedIn: boolean
-  onOpenPage: (page: PageId) => void
   onRenameGroup: (groupId: number, title: string) => void
   onViewImages: (group: GalleryGroup) => void
 }
@@ -13,10 +13,10 @@ type GalleryPageProps = {
 export function GalleryPage({
   groups,
   isLoggedIn,
-  onOpenPage,
   onRenameGroup,
   onViewImages,
 }: GalleryPageProps) {
+  const navigate = useNavigate()
   const totalImages = groups.reduce((sum, group) => sum + group.images.length, 0)
   const foodGroups = groups.filter((group) => group.type.toLowerCase().includes('food')).length
   const cityCount = new Set(groups.map((group) => group.city)).size
@@ -32,10 +32,10 @@ export function GalleryPage({
             organize memory groups, and reopen image-based travel results.
           </p>
           <div className="hero-actions">
-            <button type="button" className="button-primary" onClick={() => onOpenPage('sign-in')}>
+            <button type="button" className="button-primary" onClick={() => navigate('/sign-in')}>
               Sign in to continue
             </button>
-            <button type="button" className="button-secondary" onClick={() => onOpenPage('profile')}>
+            <button type="button" className="button-secondary" onClick={() => navigate('/profile')}>
               Open Profile
             </button>
           </div>

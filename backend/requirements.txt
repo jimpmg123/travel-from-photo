@@ -8,6 +8,7 @@ sqlalchemy
 psycopg[binary]
 alembic
 passlib[bcrypt]
+bcrypt==3.2.2
 python-jose[cryptography]
 pydantic[email]
 torch

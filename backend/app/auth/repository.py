@@ -33,7 +33,6 @@ def create_user(
         user_id=user_id,
         email=email,
         password_hash=hash_password(password),
-        auth_provider="local",
         role="traveler",
         is_active=False,
     )

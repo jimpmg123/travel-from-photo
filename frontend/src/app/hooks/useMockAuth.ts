@@ -1,42 +1,22 @@
 import { useState } from 'react'
 
 import { defaultMockAccount } from '../data'
-import type { AuthResult, MockAccount, PageNavigator, Role } from '../types'
+import type { AuthResult, MockAccount, Role } from '../types'
 
-export function useMockAuth(onOpenPage: PageNavigator) {
-  const [isLoggedIn, setIsLoggedIn] = useState(true)
-  const [role, setRole] = useState<Role>('traveler')
+export function useMockAuth() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [role] = useState<Role>('traveler')
   const [currentAccount, setCurrentAccount] = useState<MockAccount>(defaultMockAccount)
   const [createdAccount, setCreatedAccount] = useState<MockAccount | null>(null)
-
-  const toggleLogin = () => {
-    if (isLoggedIn) {
-      setIsLoggedIn(false)
-      return
-    }
-
-    setCurrentAccount(createdAccount ?? defaultMockAccount)
-    setIsLoggedIn(true)
-  }
-
-  const toggleRole = () => {
-    setRole((current) => (current === 'traveler' ? 'admin' : 'traveler'))
-  }
-
-  const openUserPage = () => {
-    onOpenPage(isLoggedIn ? 'profile' : 'sign-in')
-  }
 
   const handleCreateAccount = (account: MockAccount) => {
     setCreatedAccount(account)
     setCurrentAccount(account)
     setIsLoggedIn(false)
-    onOpenPage('sign-in')
   }
 
   const handleLogout = () => {
     setIsLoggedIn(false)
-    onOpenPage('sign-in')
   }
 
   const handleLogin = (identifier: string, password: string): AuthResult => {
@@ -62,8 +42,6 @@ export function useMockAuth(onOpenPage: PageNavigator) {
 
     setCurrentAccount(createdAccount)
     setIsLoggedIn(true)
-    onOpenPage('profile')
-
     return { success: true }
   }
 
@@ -76,10 +54,7 @@ export function useMockAuth(onOpenPage: PageNavigator) {
     handleLogin,
     handleLogout,
     isLoggedIn,
-    openUserPage,
     role,
-    toggleLogin,
-    toggleRole,
     userDisplayName,
   }
 }
