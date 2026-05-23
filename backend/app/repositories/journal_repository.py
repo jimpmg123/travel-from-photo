@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.image_metadata import ImageMetadata
@@ -6,6 +6,7 @@ from app.models.journal import (
     JOURNAL_ACTIVE_STATUSES,
     JOURNAL_STATUS_PENDING,
     Journal,
+    JournalEntry,
 )
 
 
@@ -48,3 +49,19 @@ def get_user_owned_images(
         .where(ImageMetadata.user_id == user_id)
     )
     return list(db.execute(stmt).scalars().all())
+
+
+def get_persisted_image_ids(db: Session, journal_id: int) -> set[int]:
+    """Image ids that already have a JournalEntry for this journal.
+
+    Used for idempotency: a retry of a partial job must skip these so we don't
+    double-process or trip the UNIQUE(journal_id, image_id) constraint."""
+    stmt = select(JournalEntry.image_id).where(JournalEntry.journal_id == journal_id)
+    return {row for row in db.execute(stmt).scalars().all()}
+
+
+def count_journal_entries(db: Session, journal_id: int) -> int:
+    stmt = select(func.count()).select_from(JournalEntry).where(
+        JournalEntry.journal_id == journal_id,
+    )
+    return int(db.execute(stmt).scalar_one() or 0)

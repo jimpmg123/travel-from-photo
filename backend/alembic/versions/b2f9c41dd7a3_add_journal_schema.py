@@ -52,6 +52,7 @@ def upgrade() -> None:
         sa.Column('visibility', sa.String(length=20), nullable=False, server_default='private'),
         sa.Column('status', sa.String(length=20), nullable=False, server_default='pending'),
         sa.Column('error_reason', sa.Text(), nullable=True),
+        sa.Column('skipped', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),

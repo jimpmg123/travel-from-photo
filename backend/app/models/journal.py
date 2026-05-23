@@ -17,6 +17,17 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.db import Base
 
 
+# Standardized reason codes for images that get skipped during generation.
+# Surfaced in Journal.skipped[].reason and in the GET /jobs/{id} response.
+SKIP_REASON_NO_METADATA = "NO_METADATA"
+SKIP_REASON_PLACES_API_TIMEOUT = "PLACES_API_TIMEOUT"
+SKIP_REASON_PLACES_NO_RESULT = "PLACES_NO_RESULT"
+SKIP_REASON_GPT_GENERATION_FAILED = "GPT_GENERATION_FAILED"
+# CLIP_BELOW_THRESHOLD is informational only — entries with weak CLIP are kept
+# as 'uncategorized', not skipped. Listed here so callers know the enum.
+SKIP_REASON_CLIP_BELOW_THRESHOLD = "CLIP_BELOW_THRESHOLD"
+
+
 # Status values for a Journal generation job.
 JOURNAL_STATUS_PENDING = "pending"
 JOURNAL_STATUS_PROCESSING = "processing"
@@ -69,6 +80,9 @@ class Journal(Base):
         index=True,
     )
     error_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # List of {image_id: int, reason: SKIP_REASON_*} entries — populated by the
+    # background task when individual images fail to generate.
+    skipped: Mapped[list | None] = mapped_column(JSONB, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

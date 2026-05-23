@@ -9,6 +9,7 @@ from app.models.journal import (
 )
 from app.models.user import User
 from app.repositories.journal_repository import (
+    count_journal_entries,
     create_pending_journal,
     find_active_job_for_user,
     get_journal_by_id,
@@ -18,6 +19,7 @@ from app.schemas.journal import (
     GenerateJournalRequest,
     JournalJobAccepted,
     JournalJobStatus,
+    JournalSkippedImage,
 )
 from app.services.journal.journal_jobs import process_journal_job
 
@@ -76,17 +78,27 @@ def get_journal_job(
             detail="Not authorized to view this job.",
         )
 
-    # journal_id is only meaningful once the job has actually persisted entries.
-    # Step 2 stub jumps straight to 'done' without writing entries, so we still
-    # surface journal_id for the contract — Step 5 will populate entries_created
-    # and skipped as well.
-    journal_id_for_payload = (
-        journal.id if journal.status in {JOURNAL_STATUS_DONE, JOURNAL_STATUS_PARTIAL_SUCCESS} else None
+    is_terminal_with_entries = journal.status in {
+        JOURNAL_STATUS_DONE, JOURNAL_STATUS_PARTIAL_SUCCESS,
+    }
+    journal_id_for_payload = journal.id if is_terminal_with_entries else None
+
+    skipped_payload = None
+    if journal.skipped:
+        skipped_payload = [
+            JournalSkippedImage(image_id=item["image_id"], reason=item["reason"])
+            for item in journal.skipped
+        ]
+
+    entries_created = (
+        count_journal_entries(db, journal.id) if is_terminal_with_entries else None
     )
 
     return JournalJobStatus(
         job_id=journal.id,
         status=journal.status,
         journal_id=journal_id_for_payload,
+        entries_created=entries_created,
+        skipped=skipped_payload,
         error=journal.error_reason,
     )
