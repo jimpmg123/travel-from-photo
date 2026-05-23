@@ -107,6 +107,7 @@ class JournalEntry(Base):
         index=True,
     )
 
+    # Location (filled from Places API)
     place_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     country: Mapped[str | None] = mapped_column(String(100), nullable=True)
     city: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -118,12 +119,24 @@ class JournalEntry(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    # CLIP axis A: single label (e.g. "food", "beach", "uncategorized")
-    place_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    # CLIP axis B: multi-label themes stored as JSONB list[str]
-    themes: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    # CLIP categorical (statistics-only backup, see clip_journal_service)
+    clip_subject: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    clip_atmosphere: Mapped[list | None] = mapped_column(JSONB, nullable=True)
 
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # GPT Vision categorical (rich features for pattern discovery)
+    gpt_shooting_style: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    gpt_subject_focus: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    gpt_time_of_day: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    gpt_atmosphere: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    gpt_weather_light: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    gpt_composition_habit: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    gpt_color_mood: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    gpt_cultural_layer: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    gpt_detail_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # GPT narrative text (replaces 'description')
+    journal_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     entry_order: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # Provenance (Feature 2)

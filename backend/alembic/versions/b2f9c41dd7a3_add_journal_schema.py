@@ -66,6 +66,8 @@ def upgrade() -> None:
         sa.Column('id', sa.BigInteger(), autoincrement=True, nullable=False),
         sa.Column('journal_id', sa.BigInteger(), nullable=False),
         sa.Column('image_id', sa.BigInteger(), nullable=False),
+
+        # Location (Places API)
         sa.Column('place_name', sa.String(length=255), nullable=True),
         sa.Column('country', sa.String(length=100), nullable=True),
         sa.Column('city', sa.String(length=100), nullable=True),
@@ -73,14 +75,31 @@ def upgrade() -> None:
         sa.Column('latitude', sa.Numeric(precision=9, scale=6), nullable=True),
         sa.Column('longitude', sa.Numeric(precision=9, scale=6), nullable=True),
         sa.Column('captured_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('place_type', sa.String(length=50), nullable=True),
-        sa.Column('themes', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column('description', sa.Text(), nullable=True),
+
+        # CLIP categorical (statistics-only backup)
+        sa.Column('clip_subject', sa.String(length=50), nullable=True),
+        sa.Column('clip_atmosphere', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+
+        # GPT Vision categorical (rich per-photo features — for pattern discovery)
+        sa.Column('gpt_shooting_style', sa.String(length=50), nullable=True),
+        sa.Column('gpt_subject_focus', sa.String(length=50), nullable=True),
+        sa.Column('gpt_time_of_day', sa.String(length=50), nullable=True),
+        sa.Column('gpt_atmosphere', sa.String(length=50), nullable=True),
+        sa.Column('gpt_weather_light', sa.String(length=50), nullable=True),
+        sa.Column('gpt_composition_habit', sa.String(length=50), nullable=True),
+        sa.Column('gpt_color_mood', sa.String(length=50), nullable=True),
+        sa.Column('gpt_cultural_layer', sa.String(length=50), nullable=True),
+        sa.Column('gpt_detail_note', sa.Text(), nullable=True),
+
+        # GPT narrative text
+        sa.Column('journal_text', sa.Text(), nullable=True),
+
         sa.Column('entry_order', sa.Integer(), nullable=False),
         sa.Column('generated_by', sa.String(length=20), nullable=False),
         sa.Column('model_version', sa.String(length=100), nullable=True),
         sa.Column('vocab_version', sa.String(length=20), nullable=True),
         sa.Column('generated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+
         sa.ForeignKeyConstraint(['journal_id'], ['journals.id'], ondelete='CASCADE'),
         sa.ForeignKeyConstraint(['image_id'], ['image_metadata.id'], ondelete='RESTRICT'),
         sa.PrimaryKeyConstraint('id'),
