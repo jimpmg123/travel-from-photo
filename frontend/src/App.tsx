@@ -24,12 +24,15 @@ function App() {
   const {
     closeImage,
     galleryState,
+    markGroupUnlocked,
     navigateImage,
     openGroup,
     openImage,
     renameGroup,
     selectedGalleryGroup,
     selectedGalleryImage,
+    toggleGroupLock,
+    unlockedGroupIds,
   } = useGalleryBrowser()
 
   const handleRunSearch = (session: SearchRun) => {
@@ -99,7 +102,8 @@ function App() {
               element={
                 <GalleryPage
                   groups={galleryState}
-                  isLoggedIn={isLoggedIn}
+                  unlockedGroupIds={unlockedGroupIds}
+                  onMarkUnlocked={markGroupUnlocked}
                   onRenameGroup={renameGroup}
                   onViewImages={(group) => {
                     openGroup(group)
@@ -119,6 +123,7 @@ function App() {
                     onOpenImage={openImage}
                     onCloseImage={closeImage}
                     onNavigateImage={navigateImage}
+                    onToggleLock={toggleGroupLock}
                   />
                 ) : (
                   <Navigate to="/gallery" replace />

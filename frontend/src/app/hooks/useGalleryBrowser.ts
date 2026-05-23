@@ -9,6 +9,7 @@ export function useGalleryBrowser() {
   const [galleryState, setGalleryState] = useState<GalleryGroup[]>(galleryGroups)
   const [selectedGalleryGroupId, setSelectedGalleryGroupId] = useState<number | null>(null)
   const [selectedGalleryImageId, setSelectedGalleryImageId] = useState<number | null>(null)
+  const [unlockedGroupIds, setUnlockedGroupIds] = useState<Set<number>>(() => new Set())
 
   const selectedGalleryGroup =
     galleryState.find((group) => group.id === selectedGalleryGroupId) ?? galleryState[0] ?? null
@@ -19,6 +20,23 @@ export function useGalleryBrowser() {
     setGalleryState((current) =>
       current.map((group) => (group.id === groupId ? { ...group, title } : group)),
     )
+  }
+
+  const toggleGroupLock = (groupId: number) => {
+    setGalleryState((current) =>
+      current.map((group) =>
+        group.id === groupId ? { ...group, isLocked: !group.isLocked } : group,
+      ),
+    )
+  }
+
+  const markGroupUnlocked = (groupId: number) => {
+    setUnlockedGroupIds((current) => {
+      if (current.has(groupId)) return current
+      const next = new Set(current)
+      next.add(groupId)
+      return next
+    })
   }
 
   const openGroup = (group: GalleryGroup) => {
@@ -62,11 +80,14 @@ export function useGalleryBrowser() {
   return {
     closeImage,
     galleryState,
+    markGroupUnlocked,
     navigateImage,
     openGroup,
     openImage,
     renameGroup,
     selectedGalleryGroup,
     selectedGalleryImage,
+    toggleGroupLock,
+    unlockedGroupIds,
   }
 }

@@ -1,3 +1,7 @@
+import { useState } from 'react'
+import { ArrowLeft, Lock, MapPin, Unlock } from 'lucide-react'
+
+import { CollectionMapModal } from '../components/CollectionMapModal'
 import { ImageModal } from '../components/ImageModal'
 import type { GalleryGroup, GalleryImage } from '../types'
 
@@ -8,6 +12,7 @@ type ImagesPageProps = {
   onOpenImage: (image: GalleryImage) => void
   onCloseImage: () => void
   onNavigateImage: (direction: 'prev' | 'next') => void
+  onToggleLock: (groupId: number) => void
 }
 
 export function ImagesPage({
@@ -17,46 +22,66 @@ export function ImagesPage({
   onOpenImage,
   onCloseImage,
   onNavigateImage,
+  onToggleLock,
 }: ImagesPageProps) {
+  const [showMap, setShowMap] = useState(false)
+
   return (
     <>
-      <div className="stack-xl">
-        <section className="section-heading">
-          <div>
-            <p className="eyebrow">Images</p>
-            <h2>{group.title}</h2>
-          </div>
-          <button type="button" className="button-secondary" onClick={onBack}>
-            Back to Gallery
+      <div className="images-page-shell">
+        <header className="images-page-header">
+          <button
+            type="button"
+            className="images-page-back"
+            onClick={onBack}
+            aria-label="Back to gallery"
+          >
+            <ArrowLeft size={16} />
+            <span>Back</span>
           </button>
-        </section>
 
-        <div className="badge-row">
-          <span className="pill">{group.type}</span>
-          <span className="pill">{group.city}</span>
-        </div>
+          <div className="images-page-titles">
+            <h2 className="images-page-title">{group.title}</h2>
+            <p className="images-page-meta">
+              <MapPin size={14} aria-hidden="true" />
+              <span>
+                {group.city}, {group.country} · {group.images.length} photos
+              </span>
+            </p>
+          </div>
 
-        <p className="section-copy">
-          All images saved in this collection. Click a thumbnail to open a larger preview and move
-          through the set.
-        </p>
+          <div className="images-page-actions">
+            <button
+              type="button"
+              className={`images-page-lock ${group.isLocked ? 'is-locked' : 'is-unlocked'}`}
+              onClick={() => onToggleLock(group.id)}
+              aria-pressed={group.isLocked}
+              aria-label={group.isLocked ? 'Unlock this collection' : 'Lock this collection'}
+            >
+              {group.isLocked ? <Lock size={14} /> : <Unlock size={14} />}
+              <span>{group.isLocked ? 'Locked' : 'Unlocked'}</span>
+            </button>
+            <button
+              type="button"
+              className="button-secondary images-page-map-button"
+              onClick={() => setShowMap(true)}
+            >
+              View on map
+            </button>
+          </div>
+        </header>
 
-        <section className="image-grid">
-          {group.images.map((image) => (
+        <section className="images-grid">
+          {group.images.map((image, index) => (
             <button
               key={image.id}
               type="button"
-              className="image-thumb-card"
+              className="images-grid-tile"
               onClick={() => onOpenImage(image)}
+              style={{ animationDelay: `${index * 50}ms` }}
+              aria-label={`Open ${image.title}`}
             >
-              <div className={`image-thumb-frame photo-frame photo-frame--${image.theme}`}>
-                <span className="photo-badge">{image.category}</span>
-                <strong>{image.title}</strong>
-              </div>
-              <div className="image-thumb-meta">
-                <span>{image.date}</span>
-                <span>{image.category}</span>
-              </div>
+              <div className={`photo-frame photo-frame--${image.theme} images-grid-frame`} />
             </button>
           ))}
         </section>
@@ -68,6 +93,14 @@ export function ImagesPage({
         onClose={onCloseImage}
         onNavigate={onNavigateImage}
       />
+
+      {showMap && (
+        <CollectionMapModal
+          title={group.title}
+          images={group.images}
+          onClose={() => setShowMap(false)}
+        />
+      )}
     </>
   )
 }

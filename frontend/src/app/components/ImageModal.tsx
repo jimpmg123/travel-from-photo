@@ -1,3 +1,6 @@
+import { useEffect, useState } from 'react'
+import { Check, Loader2, RotateCcw, Sparkles } from 'lucide-react'
+
 import type { GalleryImage } from '../types'
 
 type ImageModalProps = {
@@ -7,12 +10,64 @@ type ImageModalProps = {
   onNavigate: (direction: 'prev' | 'next') => void
 }
 
+type VerifyStatus = 'idle' | 'verifying' | 'confirmed' | 'updated'
+
 export function ImageModal({ image, images, onClose, onNavigate }: ImageModalProps) {
+  const [verifyStatus, setVerifyStatus] = useState<VerifyStatus>('idle')
+
+  useEffect(() => {
+    setVerifyStatus('idle')
+  }, [image?.id])
+
   if (!image) {
     return null
   }
 
   const currentIndex = images.findIndex((item) => item.id === image.id)
+
+  const handleVerify = () => {
+    if (verifyStatus === 'verifying') return
+    setVerifyStatus('verifying')
+    window.setTimeout(() => {
+      setVerifyStatus(image.id % 2 === 0 ? 'confirmed' : 'updated')
+    }, 1500)
+  }
+
+  const renderVerifyButton = () => {
+    if (verifyStatus === 'verifying') {
+      return (
+        <button type="button" className="verify-location-button is-busy" disabled>
+          <Loader2 size={14} className="verify-spinner" />
+          <span>Verifying…</span>
+        </button>
+      )
+    }
+
+    if (verifyStatus === 'confirmed') {
+      return (
+        <button type="button" className="verify-location-button is-confirmed" onClick={handleVerify}>
+          <Check size={14} />
+          <span>Location verified</span>
+        </button>
+      )
+    }
+
+    if (verifyStatus === 'updated') {
+      return (
+        <button type="button" className="verify-location-button is-updated" onClick={handleVerify}>
+          <Sparkles size={14} />
+          <span>Updated estimate ready</span>
+        </button>
+      )
+    }
+
+    return (
+      <button type="button" className="verify-location-button" onClick={handleVerify}>
+        <RotateCcw size={14} />
+        <span>Verify location</span>
+      </button>
+    )
+  }
 
   return (
     <div className="image-modal-overlay" onClick={onClose}>
@@ -65,7 +120,10 @@ export function ImageModal({ image, images, onClose, onNavigate }: ImageModalPro
         </div>
 
         <div className="image-modal-meta">
-          <h3>{image.title}</h3>
+          <div className="image-modal-meta-headline">
+            <h3>{image.title}</h3>
+            {renderVerifyButton()}
+          </div>
           <div className="image-modal-meta-row">
             <span>{image.date}</span>
             <span>{image.category}</span>

@@ -1,13 +1,16 @@
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   BookText,
   Camera,
   Image as ImageIcon,
   type LucideIcon,
+  Menu,
   MessageCircle,
   Search,
   Settings,
   User,
+  X,
 } from 'lucide-react'
 
 import { useAuth } from '../context/AuthContext'
@@ -18,6 +21,7 @@ const navPath: Record<string, string> = {
   journal: '/journal',
   gallery: '/gallery',
   'live-chat': '/chat',
+  profile: '/profile',
   settings: '/settings',
 }
 
@@ -26,6 +30,7 @@ const navIcons: Record<string, LucideIcon> = {
   journal: BookText,
   gallery: ImageIcon,
   'live-chat': MessageCircle,
+  profile: User,
   settings: Settings,
 }
 
@@ -34,6 +39,7 @@ function getActiveNavId(pathname: string): string {
   if (pathname.startsWith('/gallery')) return 'gallery'
   if (pathname === '/journal') return 'journal'
   if (pathname === '/chat') return 'live-chat'
+  if (pathname === '/profile') return 'profile'
   if (pathname === '/settings') return 'settings'
   return ''
 }
@@ -47,9 +53,20 @@ export function TopBar({ onLogout }: TopBarProps) {
   const location = useLocation()
   const { isLoggedIn, role, userDisplayName } = useAuth()
   const activeNavId = getActiveNavId(location.pathname)
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
+
+  // Close drawer whenever route changes.
+  useEffect(() => {
+    setIsMobileNavOpen(false)
+  }, [location.pathname])
 
   const openUserPage = () => {
     navigate(isLoggedIn ? '/profile' : '/sign-in')
+  }
+
+  const handleNavSelect = (id: string) => {
+    navigate(navPath[id] ?? '/')
+    setIsMobileNavOpen(false)
   }
 
   return (
@@ -120,7 +137,25 @@ export function TopBar({ onLogout }: TopBarProps) {
         })}
       </nav>
 
-      <nav className="mobile-bottom-nav" aria-label="Mobile primary">
+      {isMobileNavOpen && (
+        <div className="mobile-nav-backdrop" onClick={() => setIsMobileNavOpen(false)} />
+      )}
+
+      <button
+        type="button"
+        className={`mobile-nav-toggle ${isMobileNavOpen ? 'is-open' : ''}`}
+        onClick={() => setIsMobileNavOpen((prev) => !prev)}
+        aria-label={isMobileNavOpen ? 'Close navigation' : 'Open navigation'}
+        aria-expanded={isMobileNavOpen}
+      >
+        {isMobileNavOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+
+      <nav
+        className={`mobile-bottom-nav ${isMobileNavOpen ? 'is-open' : ''}`}
+        aria-label="Mobile primary"
+        aria-hidden={!isMobileNavOpen}
+      >
         {navItems.map((item) => {
           const Icon = navIcons[item.id]
           return (
@@ -128,8 +163,9 @@ export function TopBar({ onLogout }: TopBarProps) {
               key={item.id}
               type="button"
               className={`mobile-nav-button ${activeNavId === item.id ? 'is-active' : ''}`}
-              onClick={() => navigate(navPath[item.id] ?? '/')}
+              onClick={() => handleNavSelect(item.id)}
               aria-label={item.label}
+              tabIndex={isMobileNavOpen ? 0 : -1}
             >
               {Icon ? <Icon className="mobile-nav-icon" /> : null}
               <span>{item.label}</span>

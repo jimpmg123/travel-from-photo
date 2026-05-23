@@ -70,15 +70,19 @@ export type GalleryImage = {
   date: string
   category: string
   theme: PhotoEntry['theme']
+  latitude?: number
+  longitude?: number
 }
 
 export type GalleryGroup = {
   id: number
   title: string
   city: string
+  country: string
   type: string
   lastUpdate: string
   description: string
   theme: PhotoEntry['theme']
+  isLocked: boolean
   images: GalleryImage[]
 }
