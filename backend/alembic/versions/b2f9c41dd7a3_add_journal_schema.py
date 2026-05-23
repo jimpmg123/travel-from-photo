@@ -109,9 +109,33 @@ def upgrade() -> None:
     op.create_index(op.f('ix_journal_entries_journal_id'), 'journal_entries', ['journal_id'], unique=False)
     op.create_index(op.f('ix_journal_entries_image_id'), 'journal_entries', ['image_id'], unique=False)
 
+    # 4) Persistent caches for deterministic pipeline outputs (Feature 4).
+    op.create_table(
+        'clip_cache',
+        sa.Column('image_id', sa.BigInteger(), nullable=False),
+        sa.Column('vocab_version', sa.String(length=20), nullable=False),
+        sa.Column('clip_subject', sa.String(length=50), nullable=True),
+        sa.Column('clip_atmosphere', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.ForeignKeyConstraint(['image_id'], ['image_metadata.id'], ondelete='CASCADE'),
+        sa.PrimaryKeyConstraint('image_id', 'vocab_version'),
+    )
+
+    op.create_table(
+        'places_cache',
+        sa.Column('rounded_lat', sa.Numeric(precision=9, scale=4), nullable=False),
+        sa.Column('rounded_lng', sa.Numeric(precision=9, scale=4), nullable=False),
+        sa.Column('payload', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.PrimaryKeyConstraint('rounded_lat', 'rounded_lng'),
+    )
+
 
 def downgrade() -> None:
     """Downgrade schema."""
+
+    op.drop_table('places_cache')
+    op.drop_table('clip_cache')
 
     op.drop_index(op.f('ix_journal_entries_image_id'), table_name='journal_entries')
     op.drop_index(op.f('ix_journal_entries_journal_id'), table_name='journal_entries')

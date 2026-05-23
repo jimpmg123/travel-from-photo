@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 from app.core.db import SessionLocal
 from app.models.image_metadata import ImageMetadata
 from app.models.journal import (
+    ENTRY_GENERATED_BY_CACHE,
     ENTRY_GENERATED_BY_CLIP_GPT,
     JOURNAL_STATUS_DONE,
     JOURNAL_STATUS_FAILED,
@@ -39,6 +40,12 @@ from app.models.journal import (
     JournalEntry,
 )
 from app.repositories.journal_repository import get_persisted_image_ids
+from app.services.journal.cache_service import (
+    get_cached_clip,
+    get_cached_places,
+    set_cached_clip,
+    set_cached_places,
+)
 from app.services.journal.clip_journal_service import (
     CLIP_VOCAB_VERSION,
     classify_atmosphere,
@@ -86,36 +93,55 @@ def _sort_for_timeline(
 
 # ---------- per-image stages ----------
 
-def _try_places(image: ImageMetadata) -> tuple[dict[str, Any] | None, str | None]:
-    """Returns (place_context, skip_reason). skip_reason is None on success."""
+def _try_places(
+    db: Session, image: ImageMetadata,
+) -> tuple[dict[str, Any] | None, str | None, bool]:
+    """Returns (place_context, skip_reason, from_cache).
+    skip_reason is None on success; from_cache flags whether the result came
+    from the persistent cache (vs. a fresh Places API call)."""
+    cached = get_cached_places(db, float(image.latitude), float(image.longitude))
+    if cached is not None:
+        return cached, None, True
+
     try:
         context = enrich_coordinates_with_place_context(
             float(image.latitude), float(image.longitude), language_code="en",
         )
     except Exception:
         logger.exception("places enrichment timed out for image %d", image.id)
-        return None, SKIP_REASON_PLACES_API_TIMEOUT
+        return None, SKIP_REASON_PLACES_API_TIMEOUT, False
 
-    # An empty/garbage geocode result (e.g. coords over ocean) yields no city
-    # AND no country. Treat that as "no place" rather than persist a blank row.
+    # Empty/garbage geocode (e.g. coords over ocean) — record as no result and
+    # don't cache it (a future retry with corrected coords shouldn't be poisoned).
     if not context.get("city") and not context.get("country"):
-        return None, SKIP_REASON_PLACES_NO_RESULT
+        return None, SKIP_REASON_PLACES_NO_RESULT, False
 
-    return context, None
+    set_cached_places(db, float(image.latitude), float(image.longitude), context)
+    return context, None, False
 
 
-def _try_clip(image_path: str | None) -> tuple[str | None, list[str] | None]:
-    """Best-effort CLIP. Per spec, failure is informational only — return
-    (None, None) and let the entry persist with empty CLIP fields."""
+def _try_clip(
+    db: Session, image_id: int, image_path: str | None,
+) -> tuple[str | None, list[str] | None, bool]:
+    """Returns (subject, atmosphere, from_cache). Failure is NOT a skip per
+    spec — entry persists with empty CLIP fields if the model errors out."""
     if not image_path:
-        return None, None
+        return None, None, False
+
+    cached = get_cached_clip(db, image_id, CLIP_VOCAB_VERSION)
+    if cached is not None:
+        subject, atmosphere = cached
+        return subject, atmosphere, True
+
     try:
         subject_label, _ = classify_subject(image_path)
         atmosphere = classify_atmosphere(image_path)
-        return subject_label, atmosphere
     except Exception:
         logger.exception("CLIP tagging failed for %s", image_path)
-        return None, None
+        return None, None, False
+
+    set_cached_clip(db, image_id, CLIP_VOCAB_VERSION, subject_label, atmosphere)
+    return subject_label, atmosphere, False
 
 
 def _try_gpt(
@@ -160,6 +186,7 @@ def _build_entry(
     clip_atmosphere: list[str] | None,
     gpt_result: dict[str, Any],
     entry_order: int,
+    generated_by: str,
 ) -> JournalEntry:
     top_poi = place_context.get("top_poi") or {}
     return JournalEntry(
@@ -185,7 +212,7 @@ def _build_entry(
         gpt_detail_note=gpt_result.get("detail_note"),
         journal_text=gpt_result.get("journal_text"),
         entry_order=entry_order,
-        generated_by=ENTRY_GENERATED_BY_CLIP_GPT,
+        generated_by=generated_by,
         model_version=gpt_result.get("model_version"),
         vocab_version=CLIP_VOCAB_VERSION,
     )
@@ -230,12 +257,14 @@ def _run_pipeline(db: Session, journal: Journal, image_ids: list[int]) -> None:
             skipped.append({"image_id": image.id, "reason": SKIP_REASON_NO_METADATA})
             continue
 
-        place_context, places_skip = _try_places(image)
+        place_context, places_skip, places_cached = _try_places(db, image)
         if place_context is None:
             skipped.append({"image_id": image.id, "reason": places_skip})
             continue
 
-        clip_subject, clip_atmosphere = _try_clip(image.absolute_path)
+        clip_subject, clip_atmosphere, clip_cached = _try_clip(
+            db, image.id, image.absolute_path,
+        )
 
         gpt_result = _try_gpt(
             image_path=image.absolute_path,
@@ -246,6 +275,15 @@ def _run_pipeline(db: Session, journal: Journal, image_ids: list[int]) -> None:
             skipped.append({"image_id": image.id, "reason": SKIP_REASON_GPT_GENERATION_FAILED})
             continue
 
+        # 'cache' provenance applies only when BOTH deterministic stages came
+        # from cache. GPT is never cached, so a fully fresh GPT call still
+        # leaves the rest of the entry's data "cached-origin".
+        generated_by = (
+            ENTRY_GENERATED_BY_CACHE
+            if places_cached and clip_cached
+            else ENTRY_GENERATED_BY_CLIP_GPT
+        )
+
         entry = _build_entry(
             journal_id=journal.id,
             image=image,
@@ -255,6 +293,7 @@ def _run_pipeline(db: Session, journal: Journal, image_ids: list[int]) -> None:
             clip_atmosphere=clip_atmosphere,
             gpt_result=gpt_result,
             entry_order=next_order,
+            generated_by=generated_by,
         )
         db.add(entry)
         entries_created += 1
