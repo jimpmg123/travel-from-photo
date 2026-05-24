@@ -8,6 +8,7 @@ import { useGalleryBrowser } from './app/hooks/useGalleryBrowser'
 import { ChatPage } from './app/pages/ChatPage'
 import { GalleryPage } from './app/pages/GalleryPage'
 import { ImagesPage } from './app/pages/ImagesPage'
+import { JournalCollectionsPage } from './app/pages/JournalCollectionsPage'
 import { JournalPage } from './app/pages/JournalPage'
 import { JournalResultPage } from './app/pages/JournalResultPage'
 import { LandingAuthPage } from './app/pages/LandingAuthPage'
@@ -101,6 +102,7 @@ function App() {
             />
             <Route path="/journal" element={<JournalPage />} />
             <Route path="/journal/result/:journalId" element={<JournalResultPage />} />
+            <Route path="/journal/collections" element={<JournalCollectionsPage />} />
             <Route
               path="/gallery"
               element={
