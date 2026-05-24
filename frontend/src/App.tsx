@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import './App.css'
 import { useAuth } from './app/context/AuthContext'
+import { GenerationToast } from './app/components/GenerationToast'
 import { TopBar } from './app/components/TopBar'
 import { useGalleryBrowser } from './app/hooks/useGalleryBrowser'
 import { ChatPage } from './app/pages/ChatPage'
@@ -82,6 +83,7 @@ function App() {
       <div className="backdrop backdrop-b" />
       <div className="app-frame">
         <TopBar onLogout={() => { logout(); navigate('/sign-in') }} />
+        <GenerationToast />
 
         <main className="page-surface">
           <Routes>

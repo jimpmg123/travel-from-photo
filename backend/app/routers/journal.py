@@ -103,9 +103,9 @@ def get_journal_job(
         [JournalSkippedImage(image_id=item["image_id"], reason=item["reason"]) for item in journal.skipped]
         if journal.skipped else None
     )
-    entries_created = (
-        count_journal_entries(db, journal.id) if is_terminal_with_entries else None
-    )
+    # Always return the live entry count so the frontend toast can compute %
+    # progress while status is still 'processing'.
+    entries_created = count_journal_entries(db, journal.id)
 
     return JournalJobStatus(
         job_id=journal.id,
