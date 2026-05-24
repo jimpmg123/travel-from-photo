@@ -26,10 +26,15 @@ from app.schemas.journal import (
     JournalEntryResponse,
     JournalJobAccepted,
     JournalJobStatus,
+    JournalRecommendationsResponse,
     JournalSkippedImage,
+    JournalStatsResponse,
     JournalSummary,
+    RecommendationItem,
 )
 from app.services.journal.journal_jobs import process_journal_job
+from app.services.journal.recommendation_service import generate_recommendations
+from app.services.journal.stats_service import compute_user_stats
 
 router = APIRouter()
 
@@ -133,6 +138,30 @@ def list_journals(
         )
         for journal, entry_count, earliest, city, country in rows
     ]
+
+
+# ---------- Stats / GPT recommendations (must come BEFORE /{journal_id} to avoid path conflict) ----------
+
+@router.get("/journals/stats", response_model=JournalStatsResponse)
+def get_journal_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return JournalStatsResponse(**compute_user_stats(db, current_user.id))
+
+
+@router.get("/journals/recommendations", response_model=JournalRecommendationsResponse)
+def get_journal_recommendations(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    stats = compute_user_stats(db, current_user.id)
+    result = generate_recommendations(stats)
+    return JournalRecommendationsResponse(
+        recommendations=[RecommendationItem(**item) for item in result["recommendations"]],
+        low_data=result["low_data"],
+        model_version=result["model_version"],
+    )
 
 
 # ---------- Detail / edit / delete ----------

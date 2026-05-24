@@ -101,3 +101,32 @@ class JournalEntryEdit(BaseModel):
 class JournalEditRequest(BaseModel):
     title: str | None = None
     entries: list[JournalEntryEdit] | None = None
+
+
+# ----- Stats / recommendations -----
+
+class JournalStatsResponse(BaseModel):
+    photo_count: int
+    country_count: int
+    city_count: int
+    countries: list[str]
+    cities: list[str]
+    total_distance_km: float
+    subject_distribution: dict[str, int]
+    atmosphere_distribution: dict[str, int]
+    cultural_layer_distribution: dict[str, int]
+    color_mood_distribution: dict[str, int]
+    composition_distribution: dict[str, int]
+    time_of_day_distribution: dict[str, int]
+
+
+class RecommendationItem(BaseModel):
+    name: str
+    country: str
+    reason: str
+
+
+class JournalRecommendationsResponse(BaseModel):
+    recommendations: list[RecommendationItem]
+    low_data: bool
+    model_version: str | None = None
