@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -65,3 +67,86 @@ def count_journal_entries(db: Session, journal_id: int) -> int:
         JournalEntry.journal_id == journal_id,
     )
     return int(db.execute(stmt).scalar_one() or 0)
+
+
+def list_user_journals(db: Session, user_id: int) -> list[tuple[Journal, int, datetime | None, str | None, str | None]]:
+    """Return rows of (journal, entry_count, earliest_captured_at, primary_city,
+    primary_country) for the collections page. We bundle the aggregates into
+    one query so the collections grid stays cheap as the list grows."""
+    entry_count_subq = (
+        select(
+            JournalEntry.journal_id.label("jid"),
+            func.count().label("entry_count"),
+            func.min(JournalEntry.captured_at).label("earliest"),
+        )
+        .group_by(JournalEntry.journal_id)
+        .subquery()
+    )
+
+    # Pick the city/country from the entry with the lowest entry_order (the
+    # first chronological photo). DISTINCT ON would be cleanest but ORDER BY
+    # within a window keeps the query portable.
+    first_entry_subq = (
+        select(
+            JournalEntry.journal_id.label("jid"),
+            JournalEntry.city.label("city"),
+            JournalEntry.country.label("country"),
+            JournalEntry.entry_order.label("entry_order"),
+        )
+        .subquery()
+    )
+
+    stmt = (
+        select(
+            Journal,
+            entry_count_subq.c.entry_count,
+            entry_count_subq.c.earliest,
+            first_entry_subq.c.city,
+            first_entry_subq.c.country,
+        )
+        .outerjoin(entry_count_subq, entry_count_subq.c.jid == Journal.id)
+        .outerjoin(
+            first_entry_subq,
+            (first_entry_subq.c.jid == Journal.id) & (first_entry_subq.c.entry_order == 0),
+        )
+        .where(Journal.user_id == user_id)
+        .order_by(Journal.created_at.desc())
+    )
+
+    rows: list[tuple[Journal, int, datetime | None, str | None, str | None]] = []
+    for journal, entry_count, earliest, city, country in db.execute(stmt).all():
+        rows.append((journal, int(entry_count or 0), earliest, city, country))
+    return rows
+
+
+def get_journal_entries(db: Session, journal_id: int) -> list[JournalEntry]:
+    stmt = (
+        select(JournalEntry)
+        .where(JournalEntry.journal_id == journal_id)
+        .order_by(JournalEntry.entry_order.asc())
+    )
+    return list(db.execute(stmt).scalars().all())
+
+
+def update_journal_text(
+    db: Session,
+    journal: Journal,
+    *,
+    title: str | None,
+    entry_text_by_id: dict[int, str | None],
+) -> Journal:
+    if title is not None:
+        journal.title = title
+    if entry_text_by_id:
+        # One-shot UPDATE per entry; tiny n in practice (<=20), no batching needed.
+        for entry in get_journal_entries(db, journal.id):
+            if entry.id in entry_text_by_id:
+                entry.journal_text = entry_text_by_id[entry.id]
+    db.commit()
+    db.refresh(journal)
+    return journal
+
+
+def delete_journal(db: Session, journal: Journal) -> None:
+    db.delete(journal)
+    db.commit()
