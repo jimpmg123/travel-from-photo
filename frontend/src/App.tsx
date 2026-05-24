@@ -9,6 +9,7 @@ import { ChatPage } from './app/pages/ChatPage'
 import { GalleryPage } from './app/pages/GalleryPage'
 import { ImagesPage } from './app/pages/ImagesPage'
 import { JournalPage } from './app/pages/JournalPage'
+import { JournalResultPage } from './app/pages/JournalResultPage'
 import { LandingAuthPage } from './app/pages/LandingAuthPage'
 import { ProfilePage } from './app/pages/ProfilePage'
 import { SearchPage } from './app/pages/SearchPage'
@@ -99,6 +100,7 @@ function App() {
               }
             />
             <Route path="/journal" element={<JournalPage />} />
+            <Route path="/journal/result/:journalId" element={<JournalResultPage />} />
             <Route
               path="/gallery"
               element={
