@@ -6,7 +6,6 @@ from fastapi.staticfiles import StaticFiles
 
 from app.auth.router import router as auth_router
 from app.routers.gallery import router as gallery_router
-from app.routers.health import router as health_router
 from app.routers.image import router as image_router
 from app.routers.journal import router as journal_router
 from app.routers.profile import router as profile_router
@@ -37,10 +36,8 @@ def register_routes(app: FastAPI) -> None:
         return {
             "message": "Travel From Photo API is running",
             "docs": "/docs",
-            "health": "/api/health",
         }
 
-    app.include_router(health_router, prefix=API_PREFIX)
     app.include_router(auth_router, prefix=API_PREFIX)
     app.include_router(image_router, prefix=API_PREFIX)
     app.include_router(journal_router, prefix=API_PREFIX)
