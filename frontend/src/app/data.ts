@@ -151,73 +151,8 @@ export const defaultMockAccount: MockAccount = {
   password: 'travel2026',
 }
 
-export const galleryGroups: GalleryGroup[] = [
-  {
-    id: 1,
-    title: 'Busan memory set',
-    city: 'Busan',
-    country: 'South Korea',
-    type: 'Mixed city memory',
-    lastUpdate: 'Updated 3 days ago',
-    description: 'Coastal landmarks, harbor views, and city streets from an early spring trip.',
-    theme: 'coast',
-    isLocked: false,
-    images: [
-      { id: 101, title: 'Harbor View', date: 'March 10, 2026', category: 'Landmark', theme: 'coast', latitude: 35.0959, longitude: 129.0427 },
-      { id: 102, title: 'Sunrise Pier', date: 'March 10, 2026', category: 'Scenic', theme: 'coast', latitude: 35.1586, longitude: 129.1603 },
-      { id: 103, title: 'Bridge Skyline', date: 'March 11, 2026', category: 'Cityscape', theme: 'city', latitude: 35.1530, longitude: 129.1185 },
-      { id: 104, title: 'Ocean Walk', date: 'March 11, 2026', category: 'Scenic', theme: 'coast' },
-    ],
-  },
-  {
-    id: 2,
-    title: 'Kyoto food trail',
-    city: 'Kyoto',
-    country: 'Japan',
-    type: 'Food group',
-    lastUpdate: 'Updated 1 week ago',
-    description: 'Late-night ramen spots, alleys, and market meals from a Kyoto food run.',
-    theme: 'market',
-    isLocked: false,
-    images: [
-      { id: 201, title: 'Lantern Ramen', date: 'March 06, 2026', category: 'Food', theme: 'market', latitude: 35.0035, longitude: 135.7758 },
-      { id: 202, title: 'Street Counter', date: 'March 06, 2026', category: 'Food', theme: 'market', latitude: 35.0050, longitude: 135.7720 },
-      { id: 203, title: 'Night Alley', date: 'March 07, 2026', category: 'Cityscape', theme: 'night' },
-      { id: 204, title: 'Market Bowl', date: 'March 07, 2026', category: 'Food', theme: 'market', latitude: 35.0050, longitude: 135.7651 },
-    ],
-  },
-  {
-    id: 3,
-    title: 'Chicago city set',
-    city: 'Chicago',
-    country: 'United States',
-    type: 'Landmark group',
-    lastUpdate: 'Updated 2 weeks ago',
-    description: 'Downtown plazas, museum views, and the skyline edge around the lakefront.',
-    theme: 'city',
-    isLocked: false,
-    images: [
-      { id: 301, title: 'Museum Plaza', date: 'March 01, 2026', category: 'Landmark', theme: 'city', latitude: 41.8663, longitude: -87.6170 },
-      { id: 302, title: 'Lakefront Wind', date: 'March 01, 2026', category: 'Scenic', theme: 'city', latitude: 41.8919, longitude: -87.6051 },
-      { id: 303, title: 'Downtown Grid', date: 'March 02, 2026', category: 'Cityscape', theme: 'city', latitude: 41.8827, longitude: -87.6233 },
-      { id: 304, title: 'Glass Tower', date: 'March 02, 2026', category: 'Landmark', theme: 'city' },
-    ],
-  },
-  {
-    id: 4,
-    title: 'Taipei street moments',
-    city: 'Taipei',
-    country: 'Taiwan',
-    type: 'Mixed city memory',
-    lastUpdate: 'Updated 3 weeks ago',
-    description: 'Street food, neon markets, and dense late-night neighborhood scenes.',
-    theme: 'night',
-    isLocked: true,
-    images: [
-      { id: 401, title: 'Night Snack', date: 'February 24, 2026', category: 'Food', theme: 'night', latitude: 25.0421, longitude: 121.5070 },
-      { id: 402, title: 'Neon Crossing', date: 'February 24, 2026', category: 'Cityscape', theme: 'night', latitude: 25.0330, longitude: 121.5654 },
-      { id: 403, title: 'Temple Corner', date: 'February 25, 2026', category: 'Landmark', theme: 'market', latitude: 25.0371, longitude: 121.4998 },
-      { id: 404, title: 'Market Steam', date: 'February 25, 2026', category: 'Food', theme: 'market' },
-    ],
-  },
-]
+// Mock collections removed — the gallery now starts empty and only populates
+// when real uploads land in image_metadata (via the Search/upload pipeline,
+// not yet wired). The export is kept so callers can import it without a
+// build-time error.
+export const galleryGroups: GalleryGroup[] = []

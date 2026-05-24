@@ -3442,6 +3442,33 @@
   }
 }
 
+/* Shared empty-state copy block used by gallery / journal picker. */
+.gallery-empty {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  text-align: center;
+  padding: 64px 24px;
+  border-radius: 18px;
+  border: 1px dashed rgba(15, 23, 42, 0.18);
+  background: rgba(15, 23, 42, 0.02);
+  color: var(--muted);
+  max-width: 540px;
+  margin: 32px auto 0;
+}
+
+.gallery-empty strong {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.gallery-empty p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
 /* ============================================================
  * Journal — home / picker / photo grid / just-started
  * ============================================================ */

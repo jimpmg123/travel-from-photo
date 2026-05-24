@@ -111,22 +111,32 @@ export function JournalPage() {
           </div>
         </header>
 
-        <section className="journal-collection-grid">
-          {galleryGroups.map((group) => (
-            <button
-              key={group.id}
-              type="button"
-              className="journal-collection-tile"
-              onClick={() => enterPhotoPicker(group)}
-            >
-              <div className={`photo-frame photo-frame--${group.images[0]?.theme ?? group.theme}`} />
-              <div className="journal-collection-info">
-                <strong>{group.title}</strong>
-                <span>{group.city}, {group.country} · {group.images.length} photos</span>
-              </div>
-            </button>
-          ))}
-        </section>
+        {galleryGroups.length === 0 ? (
+          <div className="gallery-empty">
+            <strong>No collections yet</strong>
+            <p>
+              Upload photos through the Search page first — once they land in the gallery you can
+              come back here and build a journal from them.
+            </p>
+          </div>
+        ) : (
+          <section className="journal-collection-grid">
+            {galleryGroups.map((group) => (
+              <button
+                key={group.id}
+                type="button"
+                className="journal-collection-tile"
+                onClick={() => enterPhotoPicker(group)}
+              >
+                <div className={`photo-frame photo-frame--${group.images[0]?.theme ?? group.theme}`} />
+                <div className="journal-collection-info">
+                  <strong>{group.title}</strong>
+                  <span>{group.city}, {group.country} · {group.images.length} photos</span>
+                </div>
+              </button>
+            ))}
+          </section>
+        )}
       </div>
     )
   }

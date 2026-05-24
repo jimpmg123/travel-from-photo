@@ -1,3 +1,11 @@
+"""Gallery endpoints — file upload + list.
+
+The previous mock-list approach has been removed; both endpoints now operate
+against a real on-disk uploads directory only. Once the Search team wires the
+upload pipeline into the image_metadata table, GET /gallery should switch to
+returning rows from there (currently it returns an empty list because nothing
+is persisted yet).
+"""
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
@@ -30,31 +38,11 @@ class DeleteGalleryResponse(BaseModel):
     deletedId: str
 
 
-mock_gallery = [
-    {
-        "id": "img_001",
-        "fileName": "seoul_food.jpg",
-        "fileUrl": "/uploads/seoul_food.jpg",
-        "uploadedAt": datetime.utcnow(),
-        "hasGPS": True,
-        "city": "Seoul",
-        "country": "South Korea",
-    },
-    {
-        "id": "img_002",
-        "fileName": "tokyo_street.jpg",
-        "fileUrl": "/uploads/tokyo_street.jpg",
-        "uploadedAt": datetime.utcnow(),
-        "hasGPS": False,
-        "city": None,
-        "country": None,
-    },
-]
-
-
 @router.get("/gallery", response_model=GalleryListResponse)
 def get_gallery():
-    return {"items": mock_gallery}
+    # TODO Search team: return image_metadata rows for the current user once
+    # the upload pipeline persists them.
+    return {"items": []}
 
 
 @router.post("/gallery/upload")
@@ -67,32 +55,16 @@ async def upload_gallery_image(file: UploadFile = File(...)):
     with open(saved_path, "wb") as buffer:
         buffer.write(contents)
 
-    new_item = {
-        "id": f"img_{uuid4().hex[:8]}",
+    # NOTE: the file is on disk but not yet recorded in image_metadata.
+    # /journals/generate can't see this image until persistence is wired.
+    return {
+        "message": "Image uploaded to disk. Persistence to image_metadata is pending.",
         "fileName": file.filename,
         "fileUrl": f"/uploads/{saved_name}",
-        "uploadedAt": datetime.utcnow(),
-        "hasGPS": False,
-        "city": None,
-        "country": None,
-    }
-
-    mock_gallery.insert(0, new_item)
-
-    return {
-        "message": "Image uploaded successfully.",
-        "item": new_item,
     }
 
 
 @router.delete("/gallery/{image_id}", response_model=DeleteGalleryResponse)
 def delete_gallery_image(image_id: str):
-    for index, item in enumerate(mock_gallery):
-        if item["id"] == image_id:
-            mock_gallery.pop(index)
-            return {
-                "message": "Image deleted successfully.",
-                "deletedId": image_id,
-            }
-
-    raise HTTPException(status_code=404, detail="Image not found")
+    # TODO: delete the corresponding image_metadata row + the file on disk.
+    raise HTTPException(status_code=501, detail="Delete not implemented yet.")

@@ -37,6 +37,20 @@ export function GalleryPage({
     onViewImages(target)
   }
 
+  if (groups.length === 0) {
+    return (
+      <div className="gallery-page-shell">
+        <div className="gallery-empty">
+          <strong>No photos yet</strong>
+          <p>
+            Upload travel photos through the Search page (or the upload API) to start building your
+            gallery. Once images are persisted, collections will show up here automatically.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="gallery-page-shell">
       <section className="gallery-grid gallery-grid--groups">
