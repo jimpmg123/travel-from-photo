@@ -15,6 +15,7 @@ import L from 'leaflet'
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
 
 import { getJournalDetail, type JournalDetail, type JournalEntry } from '../services/journalApi'
+import { humanizeTag } from '../utils/tags'
 
 const formatHeaderDate = (iso: string | null): string => {
   if (!iso) return '—'
@@ -168,7 +169,7 @@ export function JournalDetailPage() {
                 {tags.length > 0 && (
                   <div className="journal-result-tags">
                     {tags.map((tag) => (
-                      <span key={tag} className="journal-result-tag">{tag.replace(/_/g, ' ')}</span>
+                      <span key={tag} className="journal-result-tag">{humanizeTag(tag)}</span>
                     ))}
                   </div>
                 )}

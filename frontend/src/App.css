@@ -4228,6 +4228,75 @@
   align-self: center;
 }
 
+/* ----- Behavioral DNA mini card (stats tab) ----- */
+.journal-stats-dna {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  margin-top: 4px;
+  border-radius: 12px;
+  background: rgba(124, 58, 237, 0.06);
+  border: 1px solid rgba(124, 58, 237, 0.18);
+}
+
+.journal-stats-dna-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6d28d9;
+}
+
+.journal-stats-dna strong {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--ink);
+  text-transform: lowercase;
+}
+
+.journal-stats-dna-count {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* ----- Pie tab — axis toggle + chart ----- */
+.journal-pie-tab {
+  display: grid;
+  gap: 12px;
+}
+
+.journal-pie-axis-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.journal-pie-axis-button {
+  flex: 1;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.journal-pie-axis-button:hover {
+  color: var(--ink);
+}
+
+.journal-pie-axis-button.is-active {
+  background: #ffffff;
+  color: var(--accent);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+
 /* ----- Pie chart ----- */
 
 .journal-pie-shell {

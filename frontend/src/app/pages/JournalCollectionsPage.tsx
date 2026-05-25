@@ -18,8 +18,10 @@ import {
   type JournalStats,
   type JournalSummary,
 } from '../services/journalApi'
+import { humanizeTag } from '../utils/tags'
 
 type SidebarTab = 'stats' | 'pie' | 'gpt'
+type PieAxis = 'subject' | 'atmosphere' | 'activity'
 
 const formatDate = (iso: string | null): string => {
   if (!iso) return '—'
@@ -65,7 +67,7 @@ function PieChart({ data }: { data: { label: string; value: number }[] }) {
         {slices.map((slice, idx) => (
           <li key={idx}>
             <span className="journal-pie-swatch" style={{ background: slice.color }} />
-            <span className="journal-pie-label">{slice.label.replace(/_/g, ' ')}</span>
+            <span className="journal-pie-label">{humanizeTag(slice.label)}</span>
             <span className="journal-pie-value">{slice.value}</span>
           </li>
         ))}
@@ -81,6 +83,7 @@ export function JournalCollectionsPage() {
   const [error, setError] = useState<string | null>(null)
 
   const [tab, setTab] = useState<SidebarTab>('stats')
+  const [pieAxis, setPieAxis] = useState<PieAxis>('subject')
   const [recs, setRecs] = useState<JournalRecommendations | null>(null)
   const [isLoadingRecs, setIsLoadingRecs] = useState(false)
   const [recsError, setRecsError] = useState<string | null>(null)
@@ -113,12 +116,28 @@ export function JournalCollectionsPage() {
       .finally(() => setIsLoadingRecs(false))
   }, [tab, recs, isLoadingRecs])
 
+  // Slice the chosen axis distribution and cap to top 10 — beyond that the
+  // pie becomes a fruit-salad of slivers and the legend overflows.
   const pieData = useMemo(() => {
     if (!stats) return []
-    return Object.entries(stats.subject_distribution)
+    const source: Record<string, number> =
+      pieAxis === 'subject' ? stats.subject_distribution
+      : pieAxis === 'atmosphere' ? stats.atmosphere_distribution
+      : stats.activity_distribution
+    return Object.entries(source)
       .filter(([, count]) => count > 0)
       .map(([label, value]) => ({ label, value }))
       .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
+  }, [stats, pieAxis])
+
+  // "Behavioral DNA" mini summary — top activity for the stats tab.
+  const topActivity = useMemo(() => {
+    if (!stats) return null
+    const entries = Object.entries(stats.activity_distribution)
+      .filter(([, count]) => count > 0)
+      .sort(([, a], [, b]) => b - a)
+    return entries[0] ?? null
   }, [stats])
 
   if (error) {
@@ -233,10 +252,36 @@ export function JournalCollectionsPage() {
                   <strong>{stats.total_distance_km.toLocaleString()} km</strong>
                   <span>total distance</span>
                 </div>
+
+                {topActivity && (
+                  <div className="journal-stats-dna">
+                    <span className="journal-stats-dna-label">Behavioral DNA · top activity</span>
+                    <strong>{humanizeTag(topActivity[0])}</strong>
+                    <span className="journal-stats-dna-count">{topActivity[1]} photos</span>
+                  </div>
+                )}
               </div>
             )}
 
-            {tab === 'pie' && <PieChart data={pieData} />}
+            {tab === 'pie' && (
+              <div className="journal-pie-tab">
+                <div className="journal-pie-axis-switch" role="radiogroup" aria-label="Distribution axis">
+                  {(['subject', 'atmosphere', 'activity'] as const).map((axis) => (
+                    <button
+                      key={axis}
+                      type="button"
+                      role="radio"
+                      aria-checked={pieAxis === axis}
+                      className={`journal-pie-axis-button ${pieAxis === axis ? 'is-active' : ''}`}
+                      onClick={() => setPieAxis(axis)}
+                    >
+                      {axis}
+                    </button>
+                  ))}
+                </div>
+                <PieChart data={pieData} />
+              </div>
+            )}
 
             {tab === 'gpt' && (
               <div className="journal-recs">
