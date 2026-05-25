@@ -1,23 +1,24 @@
-"""Background task entry point for asynchronous Journal generation.
+"""Background task entry point for asynchronous Journal generation (v3).
 
-Pipeline per image (in captured_at order):
-  1. Idempotency — if a JournalEntry already exists for (journal_id, image_id),
+Per image:
+  0. Idempotency — if a JournalEntry already exists for (journal_id, image_id),
      silently skip; the previous run already persisted it.
-  2. Eligibility — image must have GPS + captured_at; else NO_METADATA.
-  3. Places API — fill country/city/address/place_name. On failure record
-     PLACES_API_TIMEOUT, on empty result PLACES_NO_RESULT.
-  4. CLIP — fill clip_subject + clip_atmosphere. Failure is NOT a skip;
-     leave fields null (informational only).
-  5. GPT-4.1-mini Vision (1 retry) — fill 8 categorical features + detail_note
-     + journal_text. Permanent failure -> GPT_GENERATION_FAILED skip.
-  6. Persist JournalEntry with provenance.
+  1. Eligibility — image must have GPS + captured_at; else NO_METADATA skip.
+  2. Places API (cache-first) — fill country/city/address/place_name.
+     On failure record PLACES_API_TIMEOUT / PLACES_NO_RESULT and skip.
+  3. **Parallel** GPT Vision + CLIP (3 axis: subject/atmosphere/activity).
+     CLIP runs on a worker thread; GPT runs on another. They share no data,
+     and the per-call safety belts mean either failing falls back to defaults
+     instead of aborting the entry.
+  4. Persist JournalEntry with whatever survived. GPT fail uses fallback
+     text (entry never blank). CLIP fail leaves the axis fields empty.
 
-At end: compute status from (entries_created, total_requested, skipped).
+At end: compute final status from (entries_created, total_requested, skipped).
 """
 from __future__ import annotations
 
+import concurrent.futures
 import logging
-import time
 from datetime import datetime
 from typing import Any
 
@@ -32,7 +33,6 @@ from app.models.journal import (
     JOURNAL_STATUS_FAILED,
     JOURNAL_STATUS_PARTIAL_SUCCESS,
     JOURNAL_STATUS_PROCESSING,
-    SKIP_REASON_GPT_GENERATION_FAILED,
     SKIP_REASON_NO_METADATA,
     SKIP_REASON_PLACES_API_TIMEOUT,
     SKIP_REASON_PLACES_NO_RESULT,
@@ -48,6 +48,7 @@ from app.services.journal.cache_service import (
 )
 from app.services.journal.clip_journal_service import (
     CLIP_VOCAB_VERSION,
+    classify_activity,
     classify_atmosphere,
     classify_subject,
 )
@@ -56,7 +57,8 @@ from app.services.shared.places_service import enrich_coordinates_with_place_con
 
 logger = logging.getLogger(__name__)
 
-GPT_RETRY_DELAY_SECONDS = 1.0  # one short retry per spec ("after retry")
+# Hard cap on Places API per image (cascading-failure safety belt).
+PLACES_REQUEST_TIMEOUT_SECONDS = 15.0
 
 
 # ---------- helpers ----------
@@ -96,23 +98,30 @@ def _sort_for_timeline(
 def _try_places(
     db: Session, image: ImageMetadata,
 ) -> tuple[dict[str, Any] | None, str | None, bool]:
-    """Returns (place_context, skip_reason, from_cache).
-    skip_reason is None on success; from_cache flags whether the result came
-    from the persistent cache (vs. a fresh Places API call)."""
+    """Returns (place_context, skip_reason, from_cache)."""
     cached = get_cached_places(db, float(image.latitude), float(image.longitude))
     if cached is not None:
         return cached, None, True
 
-    try:
-        context = enrich_coordinates_with_place_context(
-            float(image.latitude), float(image.longitude), language_code="en",
+    # Run the (potentially slow) Places call on a worker thread so we can
+    # impose a real wall-clock timeout. Without this, a hung HTTP socket
+    # could pin the entire BackgroundTask waiting on a single image.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(
+            enrich_coordinates_with_place_context,
+            float(image.latitude), float(image.longitude),
         )
-    except Exception:
-        logger.exception("places enrichment timed out for image %d", image.id)
-        return None, SKIP_REASON_PLACES_API_TIMEOUT, False
+        try:
+            context = future.result(timeout=PLACES_REQUEST_TIMEOUT_SECONDS)
+        except concurrent.futures.TimeoutError:
+            logger.warning("places enrichment timed out for image %d", image.id)
+            return None, SKIP_REASON_PLACES_API_TIMEOUT, False
+        except Exception:
+            logger.exception("places enrichment failed for image %d", image.id)
+            return None, SKIP_REASON_PLACES_API_TIMEOUT, False
 
-    # Empty/garbage geocode (e.g. coords over ocean) — record as no result and
-    # don't cache it (a future retry with corrected coords shouldn't be poisoned).
+    # Coords over ocean / invalid yield no city + no country — treat as a
+    # "no place" skip rather than persist a blank row.
     if not context.get("city") and not context.get("country"):
         return None, SKIP_REASON_PLACES_NO_RESULT, False
 
@@ -120,60 +129,38 @@ def _try_places(
     return context, None, False
 
 
+def _run_clip_three_axis(image_path: str) -> dict[str, Any]:
+    """Run all three CLIP axes for one image. Caller wraps in try/except so
+    a model crash falls back to empty tag lists (CLIP failure is non-fatal
+    per spec — entry persists either way)."""
+    return {
+        "subject": classify_subject(image_path),
+        "atmosphere": classify_atmosphere(image_path),
+        "activity": classify_activity(image_path),
+    }
+
+
 def _try_clip(
     db: Session, image_id: int, image_path: str | None,
-) -> tuple[str | None, list[str] | None, bool]:
-    """Returns (subject, atmosphere, from_cache). Failure is NOT a skip per
-    spec — entry persists with empty CLIP fields if the model errors out."""
+) -> tuple[dict[str, Any], bool]:
+    """Returns (clip_result, from_cache). clip_result always has subject /
+    atmosphere / activity keys (empty lists on failure)."""
+    empty = {"subject": [], "atmosphere": [], "activity": []}
     if not image_path:
-        return None, None, False
+        return empty, False
 
     cached = get_cached_clip(db, image_id, CLIP_VOCAB_VERSION)
     if cached is not None:
-        subject, atmosphere = cached
-        return subject, atmosphere, True
+        return cached, True
 
     try:
-        subject_label, _ = classify_subject(image_path)
-        atmosphere = classify_atmosphere(image_path)
+        fresh = _run_clip_three_axis(image_path)
     except Exception:
         logger.exception("CLIP tagging failed for %s", image_path)
-        return None, None, False
+        return empty, False
 
-    set_cached_clip(db, image_id, CLIP_VOCAB_VERSION, subject_label, atmosphere)
-    return subject_label, atmosphere, False
-
-
-def _try_gpt(
-    *,
-    image_path: str | None,
-    place_context: dict[str, Any],
-    captured_at: datetime | None,
-) -> dict[str, Any] | None:
-    """One attempt + one short retry. Returns None if both fail — caller will
-    record GPT_GENERATION_FAILED and skip the entry."""
-    if not image_path:
-        return None
-
-    place_name = (place_context.get("top_poi") or {}).get("name")
-
-    for attempt in (1, 2):
-        try:
-            return analyze_journal_photo(
-                image_path,
-                country=place_context.get("country"),
-                city=place_context.get("city"),
-                place_name=place_name,
-                captured_at=captured_at,
-            )
-        except Exception:
-            logger.exception(
-                "GPT vision attempt %d failed for %s", attempt, image_path,
-            )
-            if attempt == 1:
-                time.sleep(GPT_RETRY_DELAY_SECONDS)
-
-    return None
+    set_cached_clip(db, image_id, CLIP_VOCAB_VERSION, fresh)
+    return fresh, False
 
 
 def _build_entry(
@@ -182,8 +169,7 @@ def _build_entry(
     image: ImageMetadata,
     captured_at: datetime | None,
     place_context: dict[str, Any],
-    clip_subject: str | None,
-    clip_atmosphere: list[str] | None,
+    clip_result: dict[str, Any],
     gpt_result: dict[str, Any],
     entry_order: int,
     generated_by: str,
@@ -199,8 +185,9 @@ def _build_entry(
         latitude=image.latitude,
         longitude=image.longitude,
         captured_at=captured_at,
-        clip_subject=clip_subject,
-        clip_atmosphere=clip_atmosphere,
+        clip_subject=clip_result.get("subject") or None,
+        clip_atmosphere=clip_result.get("atmosphere") or None,
+        clip_activity=clip_result.get("activity") or None,
         gpt_shooting_style=gpt_result.get("shooting_style"),
         gpt_subject_focus=gpt_result.get("subject_focus"),
         gpt_time_of_day=gpt_result.get("time_of_day"),
@@ -221,10 +208,6 @@ def _build_entry(
 # ---------- orchestration ----------
 
 def _compute_final_status(*, entries_created: int, skipped_count: int) -> str:
-    """status semantics per spec:
-       done            = no images skipped
-       partial_success = at least one entry created AND at least one skipped
-       failed          = zero entries created."""
     if entries_created == 0:
         return JOURNAL_STATUS_FAILED
     if skipped_count == 0:
@@ -244,15 +227,13 @@ def _run_pipeline(db: Session, journal: Journal, image_ids: list[int]) -> None:
 
     skipped: list[dict[str, Any]] = []
     entries_created = 0
-    # entry_order starts after whatever was persisted on a prior partial run.
+    # entry_order picks up after whatever a prior partial run persisted.
     next_order = len(persisted_already)
 
     for image, captured_at in annotated:
-        # Idempotency: a prior run already created this entry.
         if image.id in persisted_already:
             continue
 
-        # NO_METADATA — missing GPS / captured_at.
         if image.latitude is None or image.longitude is None or captured_at is None:
             skipped.append({"image_id": image.id, "reason": SKIP_REASON_NO_METADATA})
             continue
@@ -262,22 +243,47 @@ def _run_pipeline(db: Session, journal: Journal, image_ids: list[int]) -> None:
             skipped.append({"image_id": image.id, "reason": places_skip})
             continue
 
-        clip_subject, clip_atmosphere, clip_cached = _try_clip(
-            db, image.id, image.absolute_path,
-        )
+        # Run GPT + CLIP in parallel. GPT is I/O bound (~2-5s on OpenAI),
+        # CLIP is CPU bound (~0.5-3s local); overlapping them roughly halves
+        # per-image latency. Both have their own safety belts internally so
+        # neither future is allowed to throw — they always return a usable
+        # value (CLIP returns empty lists, GPT returns the fallback dict).
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            clip_future = executor.submit(_try_clip, db, image.id, image.absolute_path)
+            gpt_future = executor.submit(
+                analyze_journal_photo,
+                image.absolute_path,
+                country=place_context.get("country"),
+                city=place_context.get("city"),
+                place_name=(place_context.get("top_poi") or {}).get("name"),
+                captured_at=captured_at,
+            )
 
-        gpt_result = _try_gpt(
-            image_path=image.absolute_path,
-            place_context=place_context,
-            captured_at=captured_at,
-        )
-        if gpt_result is None:
-            skipped.append({"image_id": image.id, "reason": SKIP_REASON_GPT_GENERATION_FAILED})
-            continue
+            try:
+                clip_result, clip_cached = clip_future.result()
+            except Exception:
+                logger.exception("CLIP future raised unexpectedly for image %d", image.id)
+                clip_result = {"subject": [], "atmosphere": [], "activity": []}
+                clip_cached = False
+
+            try:
+                gpt_result = gpt_future.result()
+            except FileNotFoundError:
+                # Image vanished from disk between Places call and GPT call.
+                # Skip this image — there's nothing left to caption.
+                logger.warning("image file vanished for %d, skipping", image.id)
+                continue
+            except Exception:
+                # analyze_journal_photo is supposed to swallow API errors and
+                # return a fallback. Any leak here is unexpected — degrade safely.
+                logger.exception("GPT future raised unexpectedly for image %d", image.id)
+                from app.services.journal.gpt_vision_service import _safe_default_payload
+                gpt_result = _safe_default_payload(model_label="unknown")
 
         # 'cache' provenance applies only when BOTH deterministic stages came
-        # from cache. GPT is never cached, so a fully fresh GPT call still
-        # leaves the rest of the entry's data "cached-origin".
+        # from cache. GPT is never cached, so even a fully fresh GPT call still
+        # leaves the rest of the entry's data "cached-origin" — that's the
+        # narrowest honest definition.
         generated_by = (
             ENTRY_GENERATED_BY_CACHE
             if places_cached and clip_cached
@@ -289,8 +295,7 @@ def _run_pipeline(db: Session, journal: Journal, image_ids: list[int]) -> None:
             image=image,
             captured_at=captured_at,
             place_context=place_context,
-            clip_subject=clip_subject,
-            clip_atmosphere=clip_atmosphere,
+            clip_result=clip_result,
             gpt_result=gpt_result,
             entry_order=next_order,
             generated_by=generated_by,
@@ -301,9 +306,10 @@ def _run_pipeline(db: Session, journal: Journal, image_ids: list[int]) -> None:
 
     db.commit()
 
-    # On retry runs entries_created reflects ONLY the new entries; previously
-    # persisted ones don't bump it. For the final status we care about whether
-    # the journal as a whole now has any entries, so include the existing set.
+    # entries_created counts only NEW entries this run. Include previously
+    # persisted ones in the status decision so a retry that finished one
+    # leftover image doesn't get marked 'failed' just because this run alone
+    # produced 1 entry while skipping N.
     total_persisted = entries_created + len(persisted_already)
     journal.status = _compute_final_status(
         entries_created=total_persisted,

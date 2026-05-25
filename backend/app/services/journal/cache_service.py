@@ -27,12 +27,13 @@ def _round_coord(value: float) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.0001"))
 
 
-# ---------- CLIP cache ----------
+# ---------- CLIP cache (v3 — three axes) ----------
 
 def get_cached_clip(
     db: Session, image_id: int, vocab_version: str,
-) -> tuple[str | None, list[str] | None] | None:
-    """Return (subject, atmosphere) on hit, None on miss."""
+) -> dict[str, list[str]] | None:
+    """Return {'subject': [...], 'atmosphere': [...], 'activity': [...]} on hit,
+    None on miss. All three axes are stored as JSONB lists."""
     try:
         row = db.get(ClipCacheEntry, (image_id, vocab_version))
     except Exception:
@@ -40,21 +41,30 @@ def get_cached_clip(
         return None
     if row is None:
         return None
-    return row.clip_subject, list(row.clip_atmosphere or [])
+    return {
+        "subject": list(row.clip_subject or []),
+        "atmosphere": list(row.clip_atmosphere or []),
+        "activity": list(row.clip_activity or []),
+    }
 
 
 def set_cached_clip(
     db: Session,
     image_id: int,
     vocab_version: str,
-    subject: str | None,
-    atmosphere: list[str] | None,
+    clip_result: dict[str, list[str]],
 ) -> None:
+    """Store the full 3-axis result. `clip_result` has 'subject', 'atmosphere',
+    'activity' keys; missing keys are stored as empty lists."""
+    subject = clip_result.get("subject") or []
+    atmosphere = clip_result.get("atmosphere") or []
+    activity = clip_result.get("activity") or []
     try:
         existing = db.get(ClipCacheEntry, (image_id, vocab_version))
         if existing is not None:
             existing.clip_subject = subject
             existing.clip_atmosphere = atmosphere
+            existing.clip_activity = activity
         else:
             db.add(
                 ClipCacheEntry(
@@ -62,6 +72,7 @@ def set_cached_clip(
                     vocab_version=vocab_version,
                     clip_subject=subject,
                     clip_atmosphere=atmosphere,
+                    clip_activity=activity,
                 )
             )
         db.commit()

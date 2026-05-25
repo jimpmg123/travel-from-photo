@@ -24,9 +24,12 @@ const formatHeaderDate = (iso: string | null): string => {
 }
 
 const collectTags = (entry: JournalEntry): string[] => {
+  // v3: clip_* are multi-label arrays. Same shortlisting strategy as the
+  // result page so saved/draft views feel consistent.
   const tags: string[] = []
-  if (entry.clip_subject) tags.push(entry.clip_subject)
-  if (entry.gpt_subject_focus) tags.push(entry.gpt_subject_focus)
+  for (const t of (entry.clip_subject ?? []).slice(0, 2)) tags.push(t)
+  for (const t of (entry.clip_activity ?? []).slice(0, 2)) tags.push(t)
+  for (const t of (entry.clip_atmosphere ?? []).slice(0, 2)) tags.push(t)
   if (entry.gpt_time_of_day) tags.push(entry.gpt_time_of_day)
   if (entry.gpt_cultural_layer) tags.push(entry.gpt_cultural_layer)
   return tags

@@ -50,8 +50,9 @@ export type JournalEntry = {
   latitude: number | null
   longitude: number | null
   captured_at: string | null
-  clip_subject: string | null
+  clip_subject: string[] | null
   clip_atmosphere: string[] | null
+  clip_activity: string[] | null
   gpt_shooting_style: string | null
   gpt_subject_focus: string | null
   gpt_time_of_day: string | null
@@ -101,6 +102,7 @@ export type JournalStats = {
   total_distance_km: number
   subject_distribution: Record<string, number>
   atmosphere_distribution: Record<string, number>
+  activity_distribution: Record<string, number>
   cultural_layer_distribution: Record<string, number>
   color_mood_distribution: Record<string, number>
   composition_distribution: Record<string, number>

@@ -6,6 +6,7 @@ from here — those modules remain on disk only until the cleanup pass.
 """
 from app.services.journal.clip_journal_service import (
     CLIP_VOCAB_VERSION,
+    classify_activity,
     classify_atmosphere,
     classify_subject,
 )
@@ -13,6 +14,7 @@ from app.services.journal.journal_jobs import process_journal_job
 
 __all__ = [
     "CLIP_VOCAB_VERSION",
+    "classify_activity",
     "classify_atmosphere",
     "classify_subject",
     "process_journal_job",

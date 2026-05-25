@@ -48,8 +48,9 @@ class JournalEntryResponse(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     captured_at: datetime | None = None
-    clip_subject: str | None = None
+    clip_subject: list[str] | None = None
     clip_atmosphere: list[str] | None = None
+    clip_activity: list[str] | None = None
     gpt_shooting_style: str | None = None
     gpt_subject_focus: str | None = None
     gpt_time_of_day: str | None = None
@@ -114,6 +115,7 @@ class JournalStatsResponse(BaseModel):
     total_distance_km: float
     subject_distribution: dict[str, int]
     atmosphere_distribution: dict[str, int]
+    activity_distribution: dict[str, int]
     cultural_layer_distribution: dict[str, int]
     color_mood_distribution: dict[str, int]
     composition_distribution: dict[str, int]

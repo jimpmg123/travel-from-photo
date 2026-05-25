@@ -31,8 +31,10 @@ class ClipCacheEntry(Base):
         primary_key=True,
     )
     vocab_version: Mapped[str] = mapped_column(String(20), primary_key=True)
-    clip_subject: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # v3: all three axes are multi-label lists
+    clip_subject: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     clip_atmosphere: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    clip_activity: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

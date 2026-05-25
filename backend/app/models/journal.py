@@ -133,9 +133,11 @@ class JournalEntry(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    # CLIP categorical (statistics-only backup, see clip_journal_service)
-    clip_subject: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # CLIP categorical (statistics — see clip_journal_service v3)
+    # All three axes are multi-label lists now (v3 bipolar everywhere).
+    clip_subject: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     clip_atmosphere: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    clip_activity: Mapped[list | None] = mapped_column(JSONB, nullable=True)
 
     # GPT Vision categorical (rich features for pattern discovery)
     gpt_shooting_style: Mapped[str | None] = mapped_column(String(50), nullable=True)

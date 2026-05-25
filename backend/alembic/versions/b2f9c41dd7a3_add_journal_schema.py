@@ -77,9 +77,10 @@ def upgrade() -> None:
         sa.Column('longitude', sa.Numeric(precision=9, scale=6), nullable=True),
         sa.Column('captured_at', sa.DateTime(timezone=True), nullable=True),
 
-        # CLIP categorical (statistics-only backup)
-        sa.Column('clip_subject', sa.String(length=50), nullable=True),
+        # CLIP categorical (statistics) — v3: all three axes are multi-label lists
+        sa.Column('clip_subject', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column('clip_atmosphere', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column('clip_activity', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
 
         # GPT Vision categorical (rich per-photo features — for pattern discovery)
         sa.Column('gpt_shooting_style', sa.String(length=50), nullable=True),
@@ -114,8 +115,10 @@ def upgrade() -> None:
         'clip_cache',
         sa.Column('image_id', sa.BigInteger(), nullable=False),
         sa.Column('vocab_version', sa.String(length=20), nullable=False),
-        sa.Column('clip_subject', sa.String(length=50), nullable=True),
+        # v3: all three axes are multi-label lists
+        sa.Column('clip_subject', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column('clip_atmosphere', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column('clip_activity', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.ForeignKeyConstraint(['image_id'], ['image_metadata.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('image_id', 'vocab_version'),

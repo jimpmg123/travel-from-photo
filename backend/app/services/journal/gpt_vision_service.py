@@ -27,6 +27,16 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_JOURNAL_VISION_MODEL = "gpt-4.1-mini"
 
+# Hard cap on how long we'll wait for OpenAI per image. This is the cascading
+# failure prevention — if their API stalls, our background worker doesn't.
+GPT_REQUEST_TIMEOUT_SECONDS = 25.0
+
+# Default journal_text injected when GPT fails after retry. Visible to the
+# user so they know to add their own note instead of seeing a blank entry.
+DEFAULT_JOURNAL_TEXT_FALLBACK = (
+    "(automatic description unavailable for this photo — feel free to add your own note.)"
+)
+
 SUPPORTED_IMAGE_SUFFIXES = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
@@ -169,6 +179,19 @@ def _coerce_text(value: Any) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
+def _safe_default_payload(model_label: str) -> dict[str, Any]:
+    """Graceful-degradation payload — all categorical fields null, journal
+    text replaced by a user-facing fallback so the entry still renders
+    without breaking the page. Used when GPT times out, returns invalid
+    JSON, or trips its safety policy."""
+    result: dict[str, Any] = {field: None for field in CATEGORICAL_FIELDS}
+    result["detail_note"] = None
+    result["journal_text"] = DEFAULT_JOURNAL_TEXT_FALLBACK
+    result["model_version"] = model_label
+    result["degraded"] = True
+    return result
+
+
 def analyze_journal_photo(
     image_path: str | Path,
     *,
@@ -178,38 +201,66 @@ def analyze_journal_photo(
     captured_at: datetime | None = None,
     model: str = DEFAULT_JOURNAL_VISION_MODEL,
 ) -> dict[str, Any]:
+    """Best-effort GPT Vision call. Never raises for API/JSON issues —
+    instead returns a safe payload with `degraded=True` so the orchestrator
+    can persist the entry with fallback text. Only filesystem errors
+    (missing image) propagate."""
     path = Path(image_path)
     if not path.exists() or not path.is_file():
         raise FileNotFoundError(f"Image not found: {path}")
 
-    api_key = _require_api_key()
-    client = OpenAI(api_key=api_key)
-    data_url = _encode_image_as_data_url(path)
+    try:
+        api_key = _require_api_key()
+    except RuntimeError:
+        logger.exception("OPENAI_API_KEY missing — returning fallback")
+        return _safe_default_payload(model)
+
+    client = OpenAI(api_key=api_key, timeout=GPT_REQUEST_TIMEOUT_SECONDS)
+    try:
+        data_url = _encode_image_as_data_url(path)
+    except Exception:
+        logger.exception("failed to encode image %s — returning fallback", path)
+        return _safe_default_payload(model)
+
     user_text = _build_user_prompt(
         country=country, city=city, place_name=place_name, captured_at=captured_at,
     )
 
-    response = client.responses.create(
-        model=model,
-        input=[
-            {"role": "system", "content": [{"type": "input_text", "text": SYSTEM_PROMPT}]},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "input_text", "text": user_text},
-                    {"type": "input_image", "image_url": data_url},
-                ],
-            },
-        ],
-    )
+    # OpenAI client surfaces timeouts/connection errors as exceptions; the
+    # SDK can also raise during streaming/parse. Anything thrown here becomes
+    # graceful fallback rather than a job-killing exception.
+    try:
+        response = client.responses.create(
+            model=model,
+            input=[
+                {"role": "system", "content": [{"type": "input_text", "text": SYSTEM_PROMPT}]},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": user_text},
+                        {"type": "input_image", "image_url": data_url},
+                    ],
+                },
+            ],
+        )
+    except Exception:
+        logger.exception("GPT responses.create failed for %s — returning fallback", path)
+        return _safe_default_payload(model)
 
-    raw_text = response.output_text  # SDK convenience accessor
-    payload = _extract_json_object(raw_text)
+    raw_text = getattr(response, "output_text", "") or ""
+    try:
+        payload = _extract_json_object(raw_text)
+    except Exception:
+        logger.exception("GPT returned non-JSON for %s — returning fallback", path)
+        return _safe_default_payload(getattr(response, "model", None) or model)
 
     result: dict[str, Any] = {field: _coerce_categorical(field, payload.get(field)) for field in CATEGORICAL_FIELDS}
     result["detail_note"] = _coerce_text(payload.get("detail_note"))
-    result["journal_text"] = _coerce_text(payload.get("journal_text"))
-    # SDK exposes the actual model id used for the response (date-suffixed alias);
-    # falling back to the requested model keeps provenance non-null even on older SDKs.
+    journal_text = _coerce_text(payload.get("journal_text"))
+    # If GPT returned JSON shape-correctly but left journal_text empty (e.g.
+    # safety-filtered partial response), still substitute the fallback so the
+    # frontend never has to render an empty card.
+    result["journal_text"] = journal_text or DEFAULT_JOURNAL_TEXT_FALLBACK
     result["model_version"] = getattr(response, "model", None) or model
+    result["degraded"] = journal_text is None
     return result

@@ -43,18 +43,22 @@ def compute_user_stats(db: Session, user_id: int) -> dict[str, Any]:
     countries = {e.country for e in entries if e.country}
     cities = {e.city for e in entries if e.city}
 
+    # v3: subject is also multi-label now (list), and activity is a new axis.
     subject_counter: Counter[str] = Counter()
     atmosphere_counter: Counter[str] = Counter()
+    activity_counter: Counter[str] = Counter()
     cultural_layer_counter: Counter[str] = Counter()
     color_mood_counter: Counter[str] = Counter()
     composition_counter: Counter[str] = Counter()
     time_of_day_counter: Counter[str] = Counter()
 
     for e in entries:
-        if e.clip_subject:
-            subject_counter[e.clip_subject] += 1
+        for tag in e.clip_subject or []:
+            subject_counter[tag] += 1
         for theme in e.clip_atmosphere or []:
             atmosphere_counter[theme] += 1
+        for action in e.clip_activity or []:
+            activity_counter[action] += 1
         if e.gpt_cultural_layer:
             cultural_layer_counter[e.gpt_cultural_layer] += 1
         if e.gpt_color_mood:
@@ -90,6 +94,7 @@ def compute_user_stats(db: Session, user_id: int) -> dict[str, Any]:
         "total_distance_km": round(total_distance_km, 1),
         "subject_distribution": dict(subject_counter),
         "atmosphere_distribution": dict(atmosphere_counter),
+        "activity_distribution": dict(activity_counter),
         "cultural_layer_distribution": dict(cultural_layer_counter),
         "color_mood_distribution": dict(color_mood_counter),
         "composition_distribution": dict(composition_counter),
