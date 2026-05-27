@@ -8,8 +8,10 @@ from typing import Any
 from openai import OpenAI
 
 from app.core.config import OPENAI_API_KEY
+from app.core.config import OPENAI_API_KEY, OPENAI_VISION_MODEL
 
 DEFAULT_OPENAI_VISION_MODEL = "gpt-4.1-mini"
+DEFAULT_OPENAI_VISION_MODEL = OPENAI_VISION_MODEL
 SUPPORTED_IMAGE_SUFFIXES = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",

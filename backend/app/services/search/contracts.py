@@ -41,6 +41,104 @@ class SearchLocationResolution:
         return asdict(self)
 
 
+# ---------------------------------------------------------------------------
+# Tiered-flow types (Tier 0/1/2/3). Used by the new signal-fusion pipeline.
+# Lists in the dataclasses below are kept as `list[dict[str, Any]]` rather
+# than nested dataclasses so they round-trip through JSON / DB JSON columns
+# without extra serialization steps. The dataclasses are still useful as
+# typed builders — call `.to_dict()` when assembling these lists.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class RawSignal:
+    """One normalized response from a single helper (Vision API / GPT / EXIF).
+
+    `source` examples: exif_gps, vision_landmark, vision_ocr, vision_web,
+    vision_logo, vision_label, vision_object, gpt4o_main, gpt4o_arbiter.
+    `tier` records which tier produced this signal so it's easy to inspect.
+    """
+
+    source: str
+    status: str  # resolved | empty | failed | skipped
+    raw_response: dict[str, Any] | None = None
+    parsed_place_name: str | None = None
+    parsed_country: str | None = None
+    parsed_city: str | None = None
+    parsed_latitude: float | None = None
+    parsed_longitude: float | None = None
+    signal_score: float | None = None
+    failure_reason: str | None = None
+    latency_ms: int | None = None
+    tier: int | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class Candidate:
+    """A location candidate, possibly merged from many signals.
+
+    `address_components` is filled by the Places/Geocoding step and is what
+    enables hierarchical merge ("Eiffel Tower ⊂ Champ de Mars ⊂ Paris").
+    """
+
+    rank: int = 0
+    place_name: str | None = None
+    formatted_address: str | None = None
+    country: str | None = None
+    city: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    google_place_id: str | None = None
+    address_components: list[dict[str, Any]] = field(default_factory=list)
+    aggregated_score: float | None = None
+    contributing_sources: list[str] = field(default_factory=list)
+    member_signal_scores: list[dict[str, Any]] = field(default_factory=list)
+    reasoning: str | None = None
+    is_selected: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class TierResult:
+    """Output of one tier of the pipeline.
+
+    `stop_here` is the key flag: when a tier produces strong-enough evidence
+    (e.g., Tier 0 GPS sanity passes, or Tier 1 reaches consensus), it sets
+    stop_here=True and the orchestrator returns without escalating.
+    """
+
+    tier: int
+    name: str
+    signals: list[dict[str, Any]] = field(default_factory=list)
+    candidates: list[dict[str, Any]] = field(default_factory=list)
+    verdict: str | None = None  # confident | likely | suggestions | failed | inconclusive
+    stop_here: bool = False
+    elapsed_ms: int | None = None
+    notes: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class FusionResult:
+    """Final aggregated output after all tiers that actually ran."""
+
+    signals: list[dict[str, Any]] = field(default_factory=list)
+    candidates: list[dict[str, Any]] = field(default_factory=list)
+    verdict: str | None = None
+    tier_reached: int = 0
+    tier_trace: list[dict[str, Any]] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 @dataclass(slots=True)
 class SearchImageAnalysis:
     file_name: str
@@ -64,6 +162,14 @@ class SearchImageAnalysis:
     landmark_candidate: dict[str, Any] | None = None
     openai_candidate: dict[str, Any] | None = None
     hint_context: dict[str, Any] = field(default_factory=dict)
+    # Tiered-flow additions. These coexist with the cascade fields above so
+    # the response is backward-compatible while we publish the new structure.
+    signals: list[dict[str, Any]] = field(default_factory=list)
+    candidates: list[dict[str, Any]] = field(default_factory=list)
+    verdict: str | None = None
+    preprocessing: dict[str, Any] = field(default_factory=dict)
+    tier_reached: int = 0
+    tier_trace: list[dict[str, Any]] = field(default_factory=list)
 
     def apply_resolution(self, resolution: SearchLocationResolution) -> None:
         self.resolution_status = resolution.status

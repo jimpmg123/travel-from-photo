@@ -66,6 +66,8 @@ function toSearchImageResult(
       resolutionNote: 'The backend did not return any analysis payload for this image.',
       userHintUsed: null,
       ocrTextUsed: false,
+      candidates: [],
+      verdict: 'failed',
     }
   }
 
@@ -85,6 +87,8 @@ function toSearchImageResult(
       resolutionNote: 'The HTTP request failed before image analysis could complete.',
       userHintUsed: null,
       ocrTextUsed: false,
+      candidates: [],
+      verdict: 'failed',
     }
   }
 
@@ -123,6 +127,11 @@ function toSearchImageResult(
       ? [analysis.response.city, countryHint].filter(Boolean).join(', ')
       : null)
 
+  // Pass the full candidate list through so SearchResults can render
+  // "Top Match + Other Matches" per uploaded image.
+  const candidates = analysis.response.candidates ?? []
+  const verdict = analysis.response.verdict ?? null
+
   if (hasCoordinates) {
     const isApproximateOpenAi =
       resolutionSource === 'openai_location' && !openaiPlaceName
@@ -150,6 +159,8 @@ function toSearchImageResult(
             : `This result was accepted through ${sourceLabel.toLowerCase()}${ocrTextUsed ? ' with OCR context' : ''}.`,
       userHintUsed,
       ocrTextUsed,
+      candidates,
+      verdict,
     }
   }
 
@@ -175,6 +186,8 @@ function toSearchImageResult(
       'No coordinates were returned by the current search pipeline.',
     userHintUsed,
     ocrTextUsed,
+    candidates,
+    verdict,
   }
 }
 

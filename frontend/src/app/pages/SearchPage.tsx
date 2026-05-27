@@ -90,12 +90,26 @@ export function SearchPage({ onRunSearch }: SearchPageProps) {
     <div className="search-main-shell search-main-shell--hero">
       <section className="search-hero-shell">
         <div className="search-hero-copy">
-          <h2>
-            <span>Travel</span> from Photo
-          </h2>
+          <h1 className="search-page-title">Search</h1>
+          <p className="search-page-subtitle">
+            Upload a travel photo and we'll identify where it was taken — landmarks,
+            shops, streets — using a fusion of vision APIs and AI reasoning.
+          </p>
         </div>
 
         <article className="panel content-panel search-entry-card search-entry-card--hero">
+          <p className="search-hint-note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            <span>
+              <strong>Tip:</strong> add a country or city hint, and upload multiple
+              photos from the same trip — both noticeably improve accuracy.
+            </span>
+          </p>
+
           <label className="upload-zone upload-zone--hero">
             <span className="zone-kicker">Photo upload</span>
             <strong>Drop your photo here</strong>

@@ -17,7 +17,7 @@ import { ProfilePage } from './app/pages/ProfilePage'
 import { SearchPage } from './app/pages/SearchPage'
 import { SearchResultsPage } from './app/pages/SearchResultsPage'
 import { SettingsPage } from './app/pages/SettingsPage'
-import { retryFailedSearchUpload } from './app/search/api'
+import { applyCrossImageClusterReweight, retryFailedSearchUpload } from './app/search/api'
 import { buildSearchResultBundle } from './app/search/data'
 import type { SearchRun } from './app/search/types'
 
@@ -55,9 +55,10 @@ function App() {
       userHint,
     })
 
-    const nextAnalyses = latestSearchSession.analyses.map((a) =>
+    const replaced = latestSearchSession.analyses.map((a) =>
       a.uploadId === uploadId ? nextAnalysis : a,
     )
+    const nextAnalyses = applyCrossImageClusterReweight(replaced)
 
     setLatestSearchSession({
       ...latestSearchSession,

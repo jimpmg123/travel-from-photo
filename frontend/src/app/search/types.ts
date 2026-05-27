@@ -12,6 +12,23 @@ export type SearchUploadItem = {
   file: File
 }
 
+// One scored candidate location returned by the tiered fusion search.
+// The backend's `candidates` array (rank-sorted) drives the "Top Match +
+// Other Matches" UI — Top Match is rank=1, alternates are rank 2..4.
+export type Candidate = {
+  rank: number
+  place_name: string | null
+  formatted_address: string | null
+  country: string | null
+  city: string | null
+  latitude: number | null
+  longitude: number | null
+  google_place_id: string | null
+  aggregated_score: number | null   // 0..1, displayed as a percentage
+  contributing_sources: string[]     // ['vision_landmark', 'gpt4o_main', ...]
+  reasoning: string | null
+}
+
 export type SearchApiImageResponse = {
   file_name?: string
   captured_at?: string | null
@@ -55,6 +72,10 @@ export type SearchApiImageResponse = {
     user_hint_used?: string | null
     ocr_text_used?: boolean
   } | null
+  // New tiered-fusion fields (optional — older backends may omit them).
+  candidates?: Candidate[]
+  verdict?: 'confident' | 'likely' | 'suggestions' | 'failed' | null
+  tier_reached?: number
 }
 
 export type SearchUploadAnalysis =
@@ -101,6 +122,11 @@ export type SearchImageResult = {
   resolutionNote: string
   userHintUsed: string | null
   ocrTextUsed: boolean
+  // Full candidate list from the backend (rank-sorted). Used to render
+  // "Top Match + Other Matches" per uploaded image. Empty when the backend
+  // produced no candidates (failed analysis).
+  candidates: Candidate[]
+  verdict: SearchApiImageResponse['verdict']
 }
 
 export type SearchResultBundle = {

@@ -1,29 +1,26 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
 from app.core.config import GOOGLE_MAPS_API_KEY
 
+logger = logging.getLogger(__name__)
 GOOGLE_GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 
 
-# Verify that a Google Maps API key is configured before calling the Geocoding API.
 def _require_api_key() -> str:
     if not GOOGLE_MAPS_API_KEY:
-        raise RuntimeError(
-            "GOOGLE_MAPS_API_KEY is not set. Enable Geocoding API and add the key to backend/.env."
-        )
-
+        logger.critical("GOOGLE_MAPS_API_KEY is missing in environment variables.")
+        raise RuntimeError("GOOGLE_MAPS_API_KEY is not set.")
     return GOOGLE_MAPS_API_KEY
 
 
-# Extract key address fields such as country, city, and region from a Geocoding API response.
 def _parse_address_components(result: dict[str, Any]) -> dict[str, str | None]:
     components = result.get("address_components", [])
-
     country = None
     city = None
     region = None
@@ -42,9 +39,8 @@ def _parse_address_components(result: dict[str, Any]) -> dict[str, str | None]:
     if city is None:
         for component in components:
             types = set(component.get("types", []))
-            long_name = component.get("long_name")
             if "administrative_area_level_2" in types:
-                city = long_name
+                city = component.get("long_name")
                 break
 
     return {
@@ -54,16 +50,17 @@ def _parse_address_components(result: dict[str, Any]) -> dict[str, str | None]:
     }
 
 
-# Read a shared Geocoding API GET response as JSON.
 def _load_geocode_json(query_params: dict[str, Any]) -> dict[str, Any]:
     api_key = _require_api_key()
     query = urlencode({**query_params, "key": api_key})
+    try:
+        with urlopen(f"{GOOGLE_GEOCODE_URL}?{query}", timeout=5) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except Exception as e:
+        logger.error(f"Geocoding HTTP request failed: {str(e)}")
+        raise
 
-    with urlopen(f"{GOOGLE_GEOCODE_URL}?{query}", timeout=60) as response:
-        return json.loads(response.read().decode("utf-8"))
 
-
-# Normalize the first Geocoding result into a shared response format.
 def _normalize_geocode_result(result: dict[str, Any]) -> dict[str, Any]:
     geometry = result.get("geometry", {})
     location = geometry.get("location", {})
@@ -78,16 +75,16 @@ def _normalize_geocode_result(result: dict[str, Any]) -> dict[str, Any]:
         "region": parsed_components["region"],
         "latitude": location.get("lat"),
         "longitude": location.get("lng"),
+        "address_components": result.get("address_components", []),
     }
 
 
-# Convert coordinates into a human-readable address.
 def reverse_geocode_coordinates(
     latitude: float,
     longitude: float,
     *,
     language_code: str = "en",
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
     payload = _load_geocode_json(
         {
             "latlng": f"{latitude},{longitude}",
@@ -96,12 +93,16 @@ def reverse_geocode_coordinates(
     )
 
     status = payload.get("status")
+    if status == "ZERO_RESULTS":
+        logger.warning(f"No geocoding results found for coordinates: {latitude}, {longitude}")
+        return None
     if status != "OK":
+        logger.error(f"Google reverse geocoding failed with status: {status}")
         raise RuntimeError(f"Google reverse geocoding failed with status: {status}")
 
     results = payload.get("results", [])
     if not results:
-        raise RuntimeError("Google reverse geocoding returned no results.")
+        return None
 
     top_result = _normalize_geocode_result(results[0])
     return {
@@ -112,13 +113,12 @@ def reverse_geocode_coordinates(
     }
 
 
-# Convert an address into coordinates.
 def geocode_address(
     address: str,
     *,
     language_code: str = "en",
     region_code: str | None = None,
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
     normalized_address = address.strip()
     if not normalized_address:
         raise ValueError("address must not be empty.")
@@ -133,12 +133,16 @@ def geocode_address(
     payload = _load_geocode_json(query_params)
 
     status = payload.get("status")
+    if status == "ZERO_RESULTS":
+        logger.warning(f"No geocoding results found for address: {normalized_address}")
+        return None
     if status != "OK":
+        logger.error(f"Google geocoding failed with status: {status}")
         raise RuntimeError(f"Google geocoding failed with status: {status}")
 
     results = payload.get("results", [])
     if not results:
-        raise RuntimeError("Google geocoding returned no results.")
+        return None
 
     top_result = _normalize_geocode_result(results[0])
     return {
