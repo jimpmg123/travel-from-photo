@@ -1,23 +1,52 @@
-from fastapi import APIRouter, File, Form, UploadFile
+import shutil
+from pathlib import Path
 
-from app.services.search import analyze_uploaded_search_image
+from fastapi import APIRouter, File, UploadFile
+
+from app.services.search.image_ingestion_service import ingest_uploaded_file
+from app.services.shared.clip_service import analyze_image_by_axes
+from app.services.shared.geocoding_service import reverse_geocode_coordinates
 
 router = APIRouter()
 
 
 @router.post("/image")
-async def upload_image(
-    file: UploadFile = File(...),
-    country_hint: str | None = Form(default=None),
-    city_hint: str | None = Form(default=None),
-    user_hint: str | None = Form(default=None),
-    force_openai_retry: bool = Form(default=False),
-):
-    analysis = await analyze_uploaded_search_image(
-        file,
-        country_hint=country_hint,
-        city_hint=city_hint,
-        user_hint=user_hint,
-        force_openai_retry=force_openai_retry,
-    )
-    return analysis.to_dict()
+async def upload_image(file: UploadFile = File(...)):
+    temp_path = Path(f"temp_{file.filename}")
+
+    try:
+        with open(temp_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        await file.seek(0)
+
+        metadata = await ingest_uploaded_file(file)
+        result_data = metadata.model_dump() if hasattr(metadata, "model_dump") else dict(metadata)
+
+        gps = result_data.get("gps")
+        has_gps = gps is not None and gps.get("latitude") is not None and gps.get("longitude") is not None
+
+        if has_gps:
+            try:
+                reverse_result = reverse_geocode_coordinates(
+                    gps["latitude"],
+                    gps["longitude"],
+                    language_code="en",
+                )
+                result_data["city"] = reverse_result.get("city") or reverse_result.get("region") or "Unknown Region"
+            except Exception as exc:
+                print(f"[Error] Reverse geocoding failed: {exc}")
+                result_data["city"] = "Geocoding Failed"
+        else:
+            result_data["city"] = "Unknown Location"
+
+        try:
+            clip_result = analyze_image_by_axes(temp_path)
+            result_data["summary"] = clip_result.get("summary") if isinstance(clip_result, dict) else clip_result
+        except Exception as exc:
+            print(f"[Error] CLIP analysis failed: {exc}")
+            result_data["summary"] = None
+
+        return result_data
+    finally:
+        temp_path.unlink(missing_ok=True)

@@ -1,83 +1,66 @@
 # Travel From Photo
 
-Travel From Photo is an AI-powered web application that helps users recover likely locations from travel photos, infer restaurant candidates from food images, and generate routes to those places.
+Travel From Photo is a web application for recovering and organizing travel photo locations. This branch includes deployment-ready B-track work for profile/settings, live chat, and admin management.
 
-## Team Members
-
-- Jinu Hong - Frontend, Backend Developer
-- Younghak Yoo - AI / Computer Vision Engineer
-
-## Problem Statement
-
-Travelers often lose location information after photos are shared or moved between devices. Existing image-based tools also struggle when a photo contains food, indoor scenes, or visually generic places, making it difficult to recover where the photo was taken.
-
-## Solution Overview
-
-Our system allows users to upload travel photos, upload food photos, or enter a destination manually. The backend combines metadata extraction, landmark detection, semantic image analysis, and user-provided context to infer a likely place or restaurant candidate, then presents the result on a map and supports route guidance.
-
-## Additional Documentation
-
-### How to Run Locally
-
-If you want to view the website locally, there are a few setup steps in addition to opening it in a browser.
-
-#### Prerequisites
-
-- Node.js
-- Python 3.10+
-- Docker
-
-#### 1. Start the database
-
-From the repository root:
+## Run locally with Docker
 
 ```bash
-docker compose up -d
+cp .env.example .env
+docker compose up --build
 ```
 
-#### 2. Configure backend environment variables
-
-Create `backend/.env` based on `backend/.env.example` and fill in the required values.
-
-Required/used variables include:
-
-- `OPENAI_API_KEY`
-- `GOOGLE_MAPS_API_KEY`
-- `GOOGLE_CLOUD_VISION_API_KEY`
-- `GOOGLE_APPLICATION_CREDENTIALS`
-- `VISUAL_CROSSING_API_KEY`
-- `DATABASE_URL`
-
-#### 3. Run the backend
+Seed the B-track database records:
 
 ```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+docker compose exec backend python -m app.scripts.seed_social
 ```
 
-#### 4. Run the frontend
+Frontend:
 
-In a separate terminal:
+```text
+http://localhost
+```
+
+Backend API docs:
+
+```text
+http://localhost:8000/docs
+```
+
+## B-track deployment status
+
+The B-track features are now backed by PostgreSQL instead of JSON demo data.
+
+- Profile and settings: `users`, `user_settings`
+- Live chat: `chat_messages`
+- Admin moderation: `moderation_items`
+- Admin user controls: real `users` table
+- Docker deployment: frontend, backend, and database services
+
+See `docs/B_TRACK_DEPLOYMENT_NOTES.md` for details and A/B merge notes.
+
+## Database setup included
+
+This version includes a real PostgreSQL schema under `db/`. The database is created automatically when the Docker PostgreSQL volume is first created.
 
 ```bash
-cd frontend
-npm install
-npm run dev
+cp .env.example .env
+docker compose down -v
+docker compose up --build
 ```
 
-#### 5. Open the application
+The main schema files are:
 
-- Frontend: `http://localhost:5173`
-- Backend API docs: `http://localhost:8000/docs`
+```text
+db/init/001_schema.sql
+db/init/002_seed.sql
+docs/DB_SETUP.md
+```
 
-#### Notes
+The schema includes `users`, `user_settings`, `gallery_groups`, `images`, `search_results`, `selected_locations`, `journals`, `chat_messages`, `moderation_items`, and `image_metadata`.
 
-- Some features depend on external APIs and may not work unless the corresponding API keys are configured.
-- Uploaded files are served from the backend `uploads/` directory.
+To inspect the tables after startup:
 
-- [Project Details](docs/project-details.md)
-- [System Architecture](docs/system-architecture.md)
-- [API Overview](docs/api-overview.md)
-- [API Details](docs/api-details.md)
-- [Errors and Fallbacks](docs/errors-and-fallbacks.md)
+```bash
+docker compose exec db psql -U travel_user -d travel_db -c "\dt"
+```

@@ -9,25 +9,25 @@ DEFAULT_BURST_WINDOW_SECONDS = 10
 DEFAULT_BURST_DISTANCE_METERS = 30.0
 
 
-# Internal helper for simple average calculations.
+# 단순 평균 계산용 내부 헬퍼다.
 def _mean(values: list[float]) -> float:
     return sum(values) / len(values)
 
 
-# Compute the center coordinates of the current observation group.
+# 현재 observation 묶음의 중심 좌표를 계산한다.
 def _observation_center(images: list[JournalImageInput]) -> tuple[float, float]:
     latitudes = [image.latitude for image in images if image.latitude is not None]
     longitudes = [image.longitude for image in images if image.longitude is not None]
     return _mean(latitudes), _mean(longitudes)
 
 
-# Treat one image as a single observation and multiple images as a burst observation.
+# 한 장이면 single, 여러 장이면 burst observation으로 본다.
 def _observation_kind(image_count: int) -> str:
     return "burst" if image_count > 1 else "single"
 
 
-# Decide whether a new image can be merged into the current observation.
-# Use a 10-second rule anchored on the first image, not a pairwise chain.
+# 새 이미지가 현재 observation에 합쳐질 수 있는지 판단한다.
+# pairwise 체인이 아니라 첫 이미지 기준 10초 규칙을 쓴다.
 def _can_join_observation(
     observation_images: list[JournalImageInput],
     candidate: JournalImageInput,
@@ -54,7 +54,7 @@ def _can_join_observation(
     )
 
 
-# Group eligible images into observations in chronological order.
+# eligible 이미지들을 시간순으로 observation 단위로 묶는다.
 def build_observations(
     images: list[JournalImageInput],
     *,

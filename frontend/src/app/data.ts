@@ -9,14 +9,12 @@ import type {
 
 export const navItems: NavItem[] = [
   { id: 'search', label: 'Search', hint: 'travel-photo intake' },
-  { id: 'travelize-1', label: 'Travelize', hint: 'itinerary builder' },
   { id: 'gallery', label: 'Gallery', hint: 'my uploads' },
-  { id: 'profile', label: 'Profile', hint: 'account + settings' },
-  {
-    id: 'journal',
-    label: 'Journal',
-    hint: 'Generate Travel Log'
-  }
+  { id: 'journal', label: 'Journal', hint: 'Generate Travel Log' },
+  { id: 'live-chat', label: 'Live Chat', hint: 'support room' },
+  { id: 'settings', label: 'Settings', hint: 'privacy + theme' },
+  { id: 'profile', label: 'Profile', hint: 'account overview' },
+  { id: 'admin', label: 'Admin', hint: 'review panel' }
 ]
 
 export const metrics: Metric[] = [

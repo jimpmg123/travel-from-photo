@@ -37,7 +37,6 @@ backend/__pycache__/
 backend/.env
 backend/storage/
 backend/test_results/
-backend/test_images/Japan minato-Harrypotter/
 
 # =========================
 # Editor / OS files

@@ -37,38 +37,17 @@ def _encode_image_as_data_url(path: Path) -> str:
     return f"data:{mime_type};base64,{image_base64}"
 
 
-def _build_prompt(
-    *,
-    country_hint: str | None = None,
-    city_hint: str | None = None,
-    user_hint: str | None = None,
-    ocr_text: str | None = None,
-) -> str:
-    prompt_parts = [
-        "Look at this image and infer the most likely real-world location where it was taken or what location the image most strongly refers to.",
-        "Return only valid JSON with these keys: " '"place_name", "formatted_address".',
-        "Use place_name for the most likely landmark, venue, restaurant, station, museum, shrine, attraction, or business name if it can be inferred.",
-        "If there is no reliable place name, use null.",
-        "If you cannot infer an exact street address, return the most specific human-readable address you can in formatted_address, such as district, city, region, or country.",
-        "Do not include markdown, explanations, or extra keys.",
-    ]
-
-    if country_hint:
-        prompt_parts.append(f"Country hint: {country_hint}")
-    if city_hint:
-        prompt_parts.append(f"City hint: {city_hint}")
-    if user_hint:
-        prompt_parts.append(
-            "User hint (high priority if it is consistent with the image and other evidence): "
-            f"{user_hint}"
-        )
-    if ocr_text:
-        prompt_parts.append(
-            "OCR text extracted from the image. Use this heavily if the image is document-like or sign-like:\n"
-            f"{ocr_text}"
-        )
-
-    return "\n".join(prompt_parts)
+def _build_prompt() -> str:
+    return (
+        "Look at this image and guess where it was taken. "
+        "Return only valid JSON with these keys: "
+        '"place_name", "formatted_address". '
+        "Use place_name for the most likely landmark, venue, restaurant, or business name if it can be inferred. "
+        "If there is no reliable place name, use null. "
+        "If you cannot infer an exact street address, return the most specific human-readable address you can, "
+        "such as district, city, region, or country, in formatted_address. "
+        "Do not include markdown, explanations, or extra keys."
+    )
 
 
 def _parse_location_response(response_text: str) -> dict[str, Any]:
@@ -97,10 +76,6 @@ def analyze_image_location_with_openai(
     image_path: str | Path,
     *,
     model: str = DEFAULT_OPENAI_VISION_MODEL,
-    country_hint: str | None = None,
-    city_hint: str | None = None,
-    user_hint: str | None = None,
-    ocr_text: str | None = None,
 ) -> dict[str, Any]:
     path = Path(image_path)
 
@@ -120,15 +95,7 @@ def analyze_image_location_with_openai(
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "input_text",
-                        "text": _build_prompt(
-                            country_hint=country_hint,
-                            city_hint=city_hint,
-                            user_hint=user_hint,
-                            ocr_text=ocr_text,
-                        ),
-                    },
+                    {"type": "input_text", "text": _build_prompt()},
                     {"type": "input_image", "image_url": data_url},
                 ],
             }
@@ -144,7 +111,5 @@ def analyze_image_location_with_openai(
         "model": model,
         "place_name": parsed["place_name"],
         "formatted_address": parsed["formatted_address"],
-        "user_hint_used": user_hint,
-        "ocr_text_used": bool(ocr_text and ocr_text.strip()),
         "raw_response_text": response_text,
     }

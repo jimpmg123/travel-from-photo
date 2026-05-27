@@ -13,7 +13,7 @@ VISION_ANNOTATE_URL = "https://vision.googleapis.com/v1/images:annotate"
 DEFAULT_OCR_DETECTION_TYPE = "DOCUMENT_TEXT_DETECTION"
 
 
-# Keep OCR in the shared layer because both Search and Journal reuse it.
+# OCR은 Search와 Journal 둘 다 재사용하므로 shared 레이어에 둔다.
 def _require_api_key() -> str:
     if not GOOGLE_CLOUD_VISION_API_KEY:
         raise RuntimeError(
@@ -23,7 +23,7 @@ def _require_api_key() -> str:
     return GOOGLE_CLOUD_VISION_API_KEY
 
 
-# Build the Cloud Vision annotate request body for OCR.
+# Cloud Vision annotate 요청 바디를 OCR 용도로 만든다.
 def _build_ocr_request(
     image_bytes: bytes,
     *,
@@ -45,7 +45,7 @@ def _build_ocr_request(
     return {"requests": [request_payload]}
 
 
-# Normalize the OCR response down to extracted text and locale.
+# OCR 응답에서 전체 텍스트와 locale만 추려서 공용 포맷으로 맞춘다.
 def _extract_ocr_payload(response_payload: dict[str, Any]) -> dict[str, Any]:
     if "error" in response_payload:
         raise RuntimeError(f"Cloud Vision OCR failed: {response_payload['error']}")
@@ -73,7 +73,7 @@ def _extract_ocr_payload(response_payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-# Extract multilingual OCR text from an image file.
+# 이미지 파일에서 다국어 OCR 텍스트를 추출한다.
 def extract_text_with_cloud_vision(
     image_path: str | Path,
     *,

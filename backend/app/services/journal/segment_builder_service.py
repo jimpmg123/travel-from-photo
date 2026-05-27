@@ -26,22 +26,6 @@ def _distance_between(a: JournalObservation, b: JournalObservation) -> float:
     )
 
 
-def _anchor_name(value: str | None) -> str | None:
-    if not value:
-        return None
-
-    normalized = re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
-    return normalized or None
-
-
-def _same_anchor_name(current: JournalObservation, candidate: JournalObservation) -> bool:
-    current_anchor = _anchor_name(current.poi_name)
-    candidate_anchor = _anchor_name(candidate.poi_name)
-    if not current_anchor or not candidate_anchor:
-        return False
-    return current_anchor == candidate_anchor
-
-
 # Nearby stay observations in the same city are grouped into one stay segment.
 def _can_merge_stay(current: JournalObservation, candidate: JournalObservation) -> bool:
     if candidate.suggested_segment_type != "stay":
@@ -49,7 +33,6 @@ def _can_merge_stay(current: JournalObservation, candidate: JournalObservation) 
 
     distance = _distance_between(current, candidate)
     gap_seconds = (candidate.start_time - current.end_time).total_seconds()
-    same_anchor = _same_anchor_name(current, candidate)
     same_city = (
         current.city_snapshot is None
         or candidate.city_snapshot is None
@@ -57,7 +40,7 @@ def _can_merge_stay(current: JournalObservation, candidate: JournalObservation) 
     )
 
     return (
-        (distance <= STAY_MERGE_DISTANCE_METERS or same_anchor)
+        distance <= STAY_MERGE_DISTANCE_METERS
         and gap_seconds <= STAY_MERGE_GAP_SECONDS
         and same_city
     )
@@ -126,14 +109,6 @@ def _similar_segment_address(current: JournalSegment, candidate: JournalSegment)
     return current_head == candidate_head
 
 
-def _same_segment_anchor(current: JournalSegment, candidate: JournalSegment) -> bool:
-    current_anchor = _anchor_name(current.location_name)
-    candidate_anchor = _anchor_name(candidate.location_name)
-    if not current_anchor or not candidate_anchor:
-        return False
-    return current_anchor == candidate_anchor
-
-
 # Different-place inference uses the last observation of the current segment
 # and the first observation of the next segment.
 def _segment_edge_observations(
@@ -156,9 +131,6 @@ def _same_place_between_segments(
     current_observation: JournalObservation,
     candidate_observation: JournalObservation,
 ) -> bool:
-    if _same_segment_anchor(current, candidate):
-        return True
-
     if _similar_segment_address(current, candidate):
         return True
 
@@ -199,7 +171,6 @@ def _build_segment(
     location_name = _segment_location_name(observations)
     country = next((item.country_snapshot for item in observations if item.country_snapshot), None)
     city = next((item.city_snapshot for item in observations if item.city_snapshot), None)
-    poi_place_id = next((item.poi_place_id for item in observations if item.poi_place_id), None)
 
     return JournalSegment(
         segment_id=f"seg-{segment_order}",
@@ -208,7 +179,6 @@ def _build_segment(
         is_inferred=False,
         observation_ids=[observation.observation_id for observation in observations],
         image_ids=image_ids,
-        poi_place_id=poi_place_id,
         location_name=location_name,
         country=country,
         city=city,
@@ -241,7 +211,6 @@ def _build_inferred_transit_segment(
         is_inferred=True,
         observation_ids=[],
         image_ids=[],
-        poi_place_id=None,
         location_name="Default transit",
         country=country,
         city=city,

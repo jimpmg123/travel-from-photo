@@ -1,13 +1,3 @@
-import {
-  BookText,
-  Camera,
-  ClipboardList,
-  Image as ImageIcon,
-  type LucideIcon,
-  User,
-  Wand2,
-} from 'lucide-react'
-
 import { navItems } from '../data'
 import type { PageId, Role } from '../types'
 
@@ -43,90 +33,93 @@ export function TopBar({
         ? 'travelize-1'
         : activePage
 
-  const primaryNavItems = navItems.filter((item) => item.id !== 'profile')
-
-  const mobileNavIcons: Record<string, LucideIcon> = {
-    search: ClipboardList,
-    'travelize-1': Wand2,
-    gallery: ImageIcon,
-    journal: BookText,
-  }
-
   return (
-    <>
-      <header className="topbar" aria-label="Application header">
-        <button type="button" className="brand-anchor" onClick={() => onOpenPage('search')}>
-          <span className="brand-anchor-icon" aria-hidden="true">
-            <Camera />
-          </span>
-          <span className="brand-anchor-copy">
-            <strong>Travel From Photo</strong>
-          </span>
+    <header className="topbar panel">
+      <div className="shortcut-cluster">
+        {isLoggedIn ? (
+          <button
+            type="button"
+            className="shortcut-button logout-shortcut"
+            onClick={onLogout}
+            aria-label="Log out"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M14 4h-4a2 2 0 0 0-2 2v2h2V6h4v12h-4v-2H8v2a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Z"
+                fill="currentColor"
+              />
+              <path
+                d="M12.5 12.75H5.91l2.3 2.3-1.06 1.06L3.03 12l4.12-4.11 1.06 1.06-2.3 2.3h6.59v1.5Z"
+                fill="currentColor"
+              />
+            </svg>
+          </button>
+        ) : null}
+
+        <button
+          type="button"
+          className="shortcut-button user-shortcut"
+          onClick={onOpenUserPage}
+          aria-label={isLoggedIn ? 'Open profile page' : 'Open sign-in page'}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 12a4.25 4.25 0 1 0-4.25-4.25A4.25 4.25 0 0 0 12 12Zm0 2.25c-4.07 0-7.5 2.2-7.5 4.75V20h15v-1c0-2.55-3.43-4.75-7.5-4.75Z"
+              fill="currentColor"
+            />
+          </svg>
         </button>
+      </div>
 
-        <div className="topbar-tools">
+      <div className="brand-block">
+        <p className="eyebrow">Travel From Photo</p>
+        <div className="brand-row">
+          <h1>Travel-photo search workspace</h1>
+          <span className="pill">temporary frontend flow</span>
+        </div>
+        <p className="brand-copy">
+          Upload travel images, extract metadata, and stage EXIF, landmark recognition, CLIP, and
+          OpenAI based location inference in one flow.
+        </p>
+      </div>
+
+      <nav className="nav-links" aria-label="Primary">
+        {navItems.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className={`nav-pill ${navActivePage === item.id ? 'is-active' : ''}`}
+            onClick={() => onOpenPage(item.id)}
+          >
+            <span>{item.label}</span>
+            <small>{item.hint}</small>
+          </button>
+        ))}
+      </nav>
+
+      <div className="auth-cluster">
+        <div className="auth-summary">
+          <span className="status-dot" aria-hidden="true" />
+          <div>
+            <strong>{isLoggedIn ? `Signed in as ${userDisplayName}` : 'Guest preview mode'}</strong>
+            <p>
+              {isLoggedIn
+                ? `${role === 'traveler' ? 'Traveler' : 'Admin'} view enabled`
+                : 'Gallery remains locked until sign-in'}
+            </p>
+          </div>
           {isPending ? <span className="pending-badge">Switching view...</span> : null}
+        </div>
 
-          <button type="button" className="topbar-chip" onClick={onToggleRole}>
-            {role === 'traveler' ? 'Traveler' : 'Admin'}
+        <div className="auth-actions">
+          <button type="button" className="button-secondary" onClick={onToggleRole}>
+            Role: {role === 'traveler' ? 'Traveler' : 'Admin'}
           </button>
-
-          <button
-            type="button"
-            className="topbar-chip topbar-chip--accent"
-            onClick={isLoggedIn ? onLogout : onToggleLogin}
-          >
-            {isLoggedIn ? 'Sign out' : 'Sign in'}
-          </button>
-
-          <button
-            type="button"
-            className={`topbar-profile ${activePage === 'profile' ? 'is-active' : ''}`}
-            onClick={onOpenUserPage}
-            aria-label={isLoggedIn ? `Open profile for ${userDisplayName}` : 'Open sign-in page'}
-            title={isLoggedIn ? userDisplayName : 'Sign in'}
-          >
-            <User />
+          <button type="button" className="button-primary" onClick={onToggleLogin}>
+            {isLoggedIn ? 'Mock Sign Out' : 'Mock Sign In'}
           </button>
         </div>
-      </header>
-
-      <nav className="desktop-side-nav" aria-label="Primary desktop">
-        {primaryNavItems.map((item) => {
-          const Icon = mobileNavIcons[item.id]
-          return (
-            <button
-              key={item.id}
-              type="button"
-              className={`desktop-side-button ${navActivePage === item.id ? 'is-active' : ''}`}
-              onClick={() => onOpenPage(item.id)}
-              aria-label={item.label}
-              title={item.label}
-            >
-              {Icon ? <Icon className="desktop-side-icon" /> : null}
-              <span>{item.label}</span>
-            </button>
-          )
-        })}
-      </nav>
-
-      <nav className="mobile-bottom-nav" aria-label="Mobile primary">
-        {primaryNavItems.map((item) => {
-          const Icon = mobileNavIcons[item.id]
-          return (
-            <button
-              key={item.id}
-              type="button"
-              className={`mobile-nav-button ${navActivePage === item.id ? 'is-active' : ''}`}
-              onClick={() => onOpenPage(item.id)}
-              aria-label={item.label}
-            >
-              {Icon ? <Icon className="mobile-nav-icon" /> : null}
-              <span>{item.label}</span>
-            </button>
-          )
-        })}
-      </nav>
-    </>
+      </div>
+    </header>
   )
 }

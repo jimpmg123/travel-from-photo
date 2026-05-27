@@ -18,3 +18,15 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql+psycopg://travel_user:travel_password@127.0.0.1:5432/travel_db",
 )
+
+
+def get_cors_origins() -> list[str]:
+    raw = os.getenv("CORS_ORIGINS", "")
+    if not raw.strip():
+        return [
+            "http://localhost:4173",
+            "http://127.0.0.1:4173",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ]
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]

@@ -17,8 +17,6 @@ export type JournalPreviewObservation = {
   observation_order: number
   image_ids: number[]
   observation_kind: string
-  center_latitude: number
-  center_longitude: number
   start_time: string
   end_time: string
   city_snapshot: string | null
@@ -27,9 +25,6 @@ export type JournalPreviewObservation = {
   english_location_hint: string | null
   poi_name: string | null
   poi_primary_type: string | null
-  nearest_poi_name: string | null
-  nearest_poi_primary_type: string | null
-  nearest_poi_formatted_address: string | null
   scene_label: string | null
   suggested_segment_type: string | null
   classification_reason: string | null

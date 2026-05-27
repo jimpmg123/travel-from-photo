@@ -59,7 +59,7 @@ def get_gallery():
 
 @router.post("/gallery/upload")
 async def upload_gallery_image(file: UploadFile = File(...)):
-    file_extension = Path(file.filename or "").suffix
+    file_extension = Path(file.filename).suffix
     saved_name = f"{uuid4().hex}{file_extension}"
     saved_path = UPLOAD_DIR / saved_name
 

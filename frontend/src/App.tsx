@@ -1,4 +1,4 @@
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import './App.css'
 import { defaultMockAccount } from './app/data'
 import { TopBar } from './app/components/TopBar'
@@ -8,6 +8,9 @@ import { GalleryPage } from './app/pages/GalleryPage'
 import { ImagesPage } from './app/pages/ImagesPage'
 import { JournalPage } from './app/pages/JournalPage'
 import { ProfilePage } from './app/pages/ProfilePage'
+import { SettingsPage } from './app/pages/SettingsPage'
+import { LiveChatPage } from './app/pages/LiveChatPage'
+import { AdminPanelPage } from './app/pages/AdminPanelPage'
 import { SearchPage } from './app/pages/SearchPage'
 import { SearchResultsPage } from './app/pages/SearchResultsPage'
 import { SignInPage } from './app/pages/SignInPage'
@@ -15,9 +18,7 @@ import { TravelizeAnalysisPage } from './app/pages/TravelizeAnalysisPage'
 import { TravelizeImageInputPage } from './app/pages/TravelizeImageInputPage'
 import { TravelizeIntroPage } from './app/pages/TravelizeIntroPage'
 import { TravelizePlanPage } from './app/pages/TravelizePlanPage'
-import { retryFailedSearchUpload } from './app/search/api'
-import { buildSearchResultBundle } from './app/search/data'
-import type { SearchRun } from './app/search/types'
+import type { SearchSession } from './app/search/types'
 import {
   buildTravelizeAnalysisResults,
   createTravelizeGalleryItems,
@@ -27,6 +28,7 @@ import {
 } from './app/travelize/data'
 import type { TravelizeInputImage, TravelizeSetup } from './app/travelize/types'
 import type { MockAccount, PageId, Role } from './app/types'
+import { setSocialApiUserContext } from './app/services/socialApi'
 
 function App() {
   const [activePage, setActivePage] = useState<PageId>('search')
@@ -34,7 +36,7 @@ function App() {
   const [role, setRole] = useState<Role>('traveler')
   const [currentAccount, setCurrentAccount] = useState<MockAccount>(defaultMockAccount)
   const [createdAccount, setCreatedAccount] = useState<MockAccount | null>(null)
-  const [latestSearchSession, setLatestSearchSession] = useState<SearchRun | null>(null)
+  const [latestSearchSession, setLatestSearchSession] = useState<SearchSession | null>(null)
   const [travelizeSetup, setTravelizeSetup] = useState<TravelizeSetup>(defaultTravelizeSetup)
   const [travelizeImages, setTravelizeImages] = useState<TravelizeInputImage[]>([])
   const [isPending, startTransition] = useTransition()
@@ -59,6 +61,14 @@ function App() {
     travelizeImages.map((image) => image.id).join('|'),
   ].join('::')
 
+  useEffect(() => {
+    setSocialApiUserContext({
+      userId: currentAccount.userId,
+      email: currentAccount.email,
+      displayName: `${currentAccount.firstName} ${currentAccount.lastName}`.trim(),
+    })
+  }, [currentAccount])
+
   const openPage = (page: PageId) => {
     startTransition(() => {
       setActivePage(page)
@@ -80,43 +90,9 @@ function App() {
     openPage('sign-in')
   }
 
-  const handleRunSearch = (session: SearchRun) => {
+  const handleRunSearch = (session: SearchSession) => {
     setLatestSearchSession(session)
     openPage('search-results')
-  }
-
-  const handleRetryFailedSearchImage = async (uploadId: string, userHint: string) => {
-    if (!latestSearchSession) {
-      return
-    }
-
-    const targetUpload = latestSearchSession.uploads.find((upload) => upload.id === uploadId)
-    if (!targetUpload) {
-      return
-    }
-
-    const nextAnalysis = await retryFailedSearchUpload(targetUpload, {
-      countryHint: latestSearchSession.countryHint,
-      cityHint: latestSearchSession.cityHint,
-      userHint,
-    })
-
-    const nextAnalyses = latestSearchSession.analyses.map((analysis) =>
-      analysis.uploadId === uploadId ? nextAnalysis : analysis,
-    )
-
-    const nextSession: SearchRun = {
-      ...latestSearchSession,
-      analyses: nextAnalyses,
-      bundle: buildSearchResultBundle({
-        countryHint: latestSearchSession.countryHint,
-        cityHint: latestSearchSession.cityHint,
-        uploads: latestSearchSession.uploads,
-        analyses: nextAnalyses,
-      }),
-    }
-
-    setLatestSearchSession(nextSession)
   }
 
   const mergeTravelizeImages = (incomingImages: TravelizeInputImage[]) => {
@@ -208,7 +184,6 @@ function App() {
             isLoggedIn={isLoggedIn}
             searchSession={latestSearchSession}
             onOpenPage={openPage}
-            onRetryFailedImage={handleRetryFailedSearchImage}
           />
         )
       case 'travelize-1':
@@ -292,7 +267,20 @@ function App() {
           />
         )
       case 'profile':
-        return <ProfilePage account={currentAccount} isLoggedIn={isLoggedIn} role={role} />
+        return (
+          <ProfilePage
+            account={currentAccount}
+            isLoggedIn={isLoggedIn}
+            role={role}
+            onOpenPage={openPage}
+          />
+        )
+      case 'settings':
+        return <SettingsPage account={currentAccount} isLoggedIn={isLoggedIn} />
+      case 'live-chat':
+        return <LiveChatPage account={currentAccount} isLoggedIn={isLoggedIn} />
+      case 'admin':
+        return <AdminPanelPage role={role} isLoggedIn={isLoggedIn} />
       case 'sign-in':
         return (
           <SignInPage

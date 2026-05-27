@@ -23,7 +23,7 @@ LABEL_MAPPING = {
 }
 
 
-# Wrap raw CLIP output in the label set used by Journal classification.
+# Journal 분류에 맞는 label 세트로 CLIP 결과를 다시 감싼다.
 def classify_image_for_journal(
     image_path: str | Path,
     *,
@@ -57,7 +57,7 @@ def classify_image_for_journal(
     }
 
 
-# Fill the scene label using the observation's representative image.
+# Observation 대표 이미지를 기준으로 scene label을 채워 넣는다.
 def enrich_observation_scene(observation: JournalObservation) -> JournalObservation:
     if not observation.representative_image_path:
         return observation

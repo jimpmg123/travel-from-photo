@@ -9,3 +9,4 @@ psycopg[binary]
 torch
 transformers
 openai
+email-validator

@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 
-# Bundle the minimum input data needed for one image before it enters the Journal pipeline.
+# Journal 파이프라인에 들어가기 전, 이미지 1장에 대해 필요한 최소 입력값을 묶는다.
 @dataclass(slots=True)
 class JournalImageInput:
     image_id: int
@@ -24,7 +24,7 @@ class JournalImageInput:
         return asdict(self)
 
 
-# Record why an image was excluded from Journal processing.
+# Journal 대상에서 제외된 이미지가 왜 탈락했는지 명확하게 남긴다.
 @dataclass(slots=True)
 class JournalImageRejection:
     image_id: int
@@ -35,7 +35,7 @@ class JournalImageRejection:
         return asdict(self)
 
 
-# An observation is an intermediate unit that groups burst images into a single moment.
+# Observation은 burst 이미지를 하나의 순간 단위로 묶은 중간 결과물이다.
 @dataclass(slots=True)
 class JournalObservation:
     observation_id: str
@@ -71,7 +71,7 @@ class JournalObservation:
     transit_score: float = 0.0
     classification_reason: str | None = None
 
-    # Compute observation duration in seconds.
+    # Observation 길이를 초 단위로 계산한다.
     def duration_seconds(self) -> float:
         return max((self.end_time - self.start_time).total_seconds(), 0.0)
 
@@ -79,7 +79,7 @@ class JournalObservation:
         return asdict(self)
 
 
-# A segment is the stay/transit unit shown in the final journal timeline.
+# Segment는 최종 저널 타임라인에서 실제로 보여줄 stay / transit 구간이다.
 @dataclass(slots=True)
 class JournalSegment:
     segment_id: str
@@ -106,7 +106,7 @@ class JournalSegment:
         return asdict(self)
 
 
-# Bundle the full result of a single Journal generation request.
+# 한 번의 Journal 생성 요청에서 나온 전체 결과를 한 객체로 묶는다.
 @dataclass(slots=True)
 class JournalTimeline:
     eligible_images: list[JournalImageInput]

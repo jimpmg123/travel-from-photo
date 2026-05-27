@@ -121,14 +121,6 @@ def _address_head(formatted_address: str | None) -> str | None:
     return normalized or None
 
 
-def _anchor_name(value: str | None) -> str | None:
-    if not value:
-        return None
-
-    normalized = re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
-    return normalized or None
-
-
 # If two observations share the same address head, they may belong
 # to the same large place even when the raw coordinates spread out.
 def _similar_address_head(a: JournalObservation, b: JournalObservation) -> bool:
@@ -137,14 +129,6 @@ def _similar_address_head(a: JournalObservation, b: JournalObservation) -> bool:
     if not a_head or not b_head:
         return False
     return a_head == b_head
-
-
-def _same_anchor_name(a: JournalObservation, b: JournalObservation) -> bool:
-    a_anchor = _anchor_name(a.poi_name)
-    b_anchor = _anchor_name(b.poi_name)
-    if not a_anchor or not b_anchor:
-        return False
-    return a_anchor == b_anchor
 
 
 # POI, scene, and document signals are converted into stay/transit score deltas.
@@ -210,20 +194,13 @@ def classify_observation(
 
     previous_same_place = False
     next_same_place = False
-    previous_same_anchor = False
-    next_same_anchor = False
     previous_similar_address = False
     next_similar_address = False
 
     if previous_observation is not None:
         previous_same_place, _ = _same_place_signal(previous_observation, observation)
-        previous_same_anchor = _same_anchor_name(previous_observation, observation)
         previous_similar_address = _similar_address_head(previous_observation, observation)
         time_gap = (observation.start_time - previous_observation.end_time).total_seconds()
-
-        if previous_same_anchor:
-            stay_score += 0.65
-            reasons.append("Previous observation shares the same anchor, suggesting one large venue.")
 
         if previous_same_place and time_gap >= MIN_STAY_REVISIT_GAP_SECONDS:
             stay_score += 0.35
@@ -238,13 +215,8 @@ def classify_observation(
 
     if next_observation is not None:
         next_same_place, _ = _same_place_signal(observation, next_observation)
-        next_same_anchor = _same_anchor_name(observation, next_observation)
         next_similar_address = _similar_address_head(observation, next_observation)
         time_gap = (next_observation.start_time - observation.end_time).total_seconds()
-
-        if next_same_anchor:
-            stay_score += 0.65
-            reasons.append("Next observation shares the same anchor, suggesting one large venue.")
 
         if next_same_place and time_gap >= MIN_STAY_REVISIT_GAP_SECONDS:
             stay_score += 0.35
@@ -257,10 +229,7 @@ def classify_observation(
             transit_score += 0.10
             reasons.append("Upcoming movement to a different place adds transit bias.")
 
-    if previous_same_anchor and next_same_anchor:
-        stay_score += 0.30
-        reasons.append("Anchor matches on both sides, strongly suggesting one place.")
-    elif previous_same_place and next_same_place:
+    if previous_same_place and next_same_place:
         stay_score += 0.20
         reasons.append("Nearby observations on both sides strongly suggest a stay.")
     elif previous_similar_address and next_similar_address:
@@ -272,9 +241,7 @@ def classify_observation(
         current_to_next = _distance_between(observation, next_observation)
         prev_to_next = _distance_between(previous_observation, next_observation)
         if (
-            not previous_same_anchor
-            and not next_same_anchor
-            and not previous_same_place
+            not previous_same_place
             and not next_same_place
             and prev_to_next > SAME_PLACE_RADIUS_METERS
             and prev_to_current + current_to_next <= prev_to_next * TRANSIT_PATH_FACTOR

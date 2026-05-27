@@ -5,7 +5,7 @@ from math import asin, cos, radians, sin, sqrt
 EARTH_RADIUS_METERS = 6_371_000
 
 
-# Compute the real-world distance between two GPS points in meters.
+# GPS 두 점 사이의 실제 거리를 meter 단위로 계산한다.
 def haversine_distance_meters(
     latitude_a: float,
     longitude_a: float,
