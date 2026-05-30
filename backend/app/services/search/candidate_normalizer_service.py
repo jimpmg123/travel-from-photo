@@ -49,6 +49,9 @@ def _resolve_one_signal_sync(signal: dict[str, Any]) -> dict[str, Any] | None:
     except Exception:
         return None
 
+    if not geo:
+        return None
+
     return {
         "source": signal["source"],
         "tier": signal.get("tier"),

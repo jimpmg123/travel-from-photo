@@ -153,6 +153,91 @@ export function applyCrossImageClusterReweight(
   })
 }
 
+function pickMostCommon(values: (string | null | undefined)[]): string | null {
+  const counts = new Map<string, number>()
+  for (const v of values) {
+    if (!v) continue
+    const key = v.trim()
+    if (!key) continue
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  let bestKey: string | null = null
+  let bestCount = 0
+  for (const [k, c] of counts) {
+    if (c > bestCount) {
+      bestKey = k
+      bestCount = c
+    }
+  }
+  return bestKey
+}
+
+async function applyClusterDerivedRetry(
+  analyses: SearchUploadAnalysis[],
+  uploads: SearchUploadItem[],
+  originalHints: { countryHint: string; cityHint: string },
+): Promise<SearchUploadAnalysis[]> {
+  if (uploads.length < 2) return analyses
+
+  const anchors = analyses.filter((a) => {
+    if (!a.ok) return false
+    const top = a.response.candidates?.[0]
+    if (!top) return false
+    return (top.aggregated_score ?? 0) >= 0.6 && (a.response.verdict === 'confident' || a.response.verdict === 'likely')
+  })
+  if (anchors.length < 1) return analyses
+
+  const dominantCountry = pickMostCommon(anchors.map((a) => a.ok ? a.response.candidates?.[0]?.country ?? null : null))
+  const dominantCity = pickMostCommon(anchors.map((a) => a.ok ? a.response.candidates?.[0]?.city ?? null : null))
+
+  if (!dominantCountry && !dominantCity) return analyses
+
+  const toRetry: string[] = []
+  for (const a of analyses) {
+    if (!a.ok) {
+      toRetry.push(a.uploadId)
+      continue
+    }
+    const top = a.response.candidates?.[0]
+    const verdict = a.response.verdict ?? 'failed'
+    if (verdict === 'confident' && (top?.aggregated_score ?? 0) >= 0.7) continue
+
+    const topCountry = top?.country?.trim().toLowerCase()
+    const topCity = top?.city?.trim().toLowerCase()
+    const cCountry = dominantCountry?.toLowerCase()
+    const cCity = dominantCity?.toLowerCase()
+
+    const countryMismatch = !!(topCountry && cCountry && topCountry !== cCountry)
+    const cityMismatch = !!(topCity && cCity && topCity !== cCity)
+    const missingLocation = !topCountry && !topCity
+
+    if (countryMismatch || cityMismatch || missingLocation) {
+      toRetry.push(a.uploadId)
+    }
+  }
+
+  if (toRetry.length === 0) return analyses
+
+  const retried = await Promise.all(
+    toRetry.map(async (uploadId) => {
+      const upload = uploads.find((u) => u.id === uploadId)
+      if (!upload) return null
+      return analyzeSingleUpload(upload, {
+        countryHint: dominantCountry ?? originalHints.countryHint,
+        cityHint: dominantCity ?? originalHints.cityHint,
+        forceOpenaiRetry: true,
+      })
+    }),
+  )
+
+  const retryMap = new Map<string, SearchUploadAnalysis>()
+  for (const r of retried) {
+    if (r) retryMap.set(r.uploadId, r)
+  }
+
+  return analyses.map((a) => retryMap.get(a.uploadId) ?? a)
+}
+
 export async function analyzeSearchUploads(
   uploads: SearchUploadItem[],
   hints: {
@@ -162,7 +247,9 @@ export async function analyzeSearchUploads(
 ): Promise<SearchUploadAnalysis[]> {
   const tasks = uploads.map((upload) => analyzeSingleUpload(upload, hints))
   const analyses = await Promise.all(tasks)
-  return applyCrossImageClusterReweight(analyses)
+  const phase1Reweighted = applyCrossImageClusterReweight(analyses)
+  const phase2 = await applyClusterDerivedRetry(phase1Reweighted, uploads, hints)
+  return applyCrossImageClusterReweight(phase2)
 }
 
 export async function retryFailedSearchUpload(

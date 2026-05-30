@@ -39,6 +39,9 @@ backend/storage/
 backend/test_results/
 backend/test_images/Japan minato-Harrypotter/
 
+# user-uploaded gallery files (runtime artifacts, not source)
+backend/uploads/
+
 # =========================
 # Editor / OS files
 # =========================

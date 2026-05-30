@@ -1,32 +1,20 @@
-/**
- * Read-only view of a saved Journal. Reuses much of the visual language of
- * JournalResultPage (header date + title, entry list with photo + tags +
- * text) but everything is non-editable here — Save/Discard are gone, and a
- * "View on map" button surfaces the entries on a Leaflet map (in a modal,
- * matching the pattern used by CollectionMapModal in the gallery).
- *
- * Entries are rendered in entry_order, which the backend already sets to the
- * captured_at timeline order.
- */
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, MapPin } from 'lucide-react'
+import { ArrowLeft, MapPin, Pencil } from 'lucide-react'
 import L from 'leaflet'
-import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet'
+import { MapContainer, Marker, Polyline, TileLayer, Tooltip } from 'react-leaflet'
 
-import { getJournalDetail, type JournalDetail, type JournalEntry } from '../services/journalApi'
+import { editJournal, getJournalDetail, type JournalDetail, type JournalEntry } from '../services/journalApi'
 import { humanizeTag } from '../utils/tags'
 
 const formatHeaderDate = (iso: string | null): string => {
-  if (!iso) return '—'
+  if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
   return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}, ${d.getFullYear()} Journal`
 }
 
 const collectTags = (entry: JournalEntry): string[] => {
-  // v3: clip_* are multi-label arrays. Same shortlisting strategy as the
-  // result page so saved/draft views feel consistent.
   const tags: string[] = []
   for (const t of (entry.clip_subject ?? []).slice(0, 2)) tags.push(t)
   for (const t of (entry.clip_activity ?? []).slice(0, 2)) tags.push(t)
@@ -36,25 +24,23 @@ const collectTags = (entry: JournalEntry): string[] => {
   return tags
 }
 
-// Numbered pin in the same visual idiom as CollectionMapModal — keeps the
-// map UI consistent between gallery and journal contexts.
 const numberedPin = (n: number) =>
   L.divIcon({
     className: 'journal-map-pin',
     html: `
       <div style="
-        width: 30px; height: 30px;
+        width: 32px; height: 32px;
         border-radius: 999px;
         background: #ffffff;
         border: 2px solid #2d6a5f;
         color: #2d6a5f;
         display: grid; place-items: center;
-        font-weight: 700; font-size: 12px;
+        font-weight: 700; font-size: 13px;
         box-shadow: 0 6px 16px rgba(0,0,0,0.18);
       ">${n}</div>
     `,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
   })
 
 export function JournalDetailPage() {
@@ -63,6 +49,10 @@ export function JournalDetailPage() {
   const [detail, setDetail] = useState<JournalDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showMap, setShowMap] = useState(false)
+  const [currentEntry, setCurrentEntry] = useState(0)
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
+  const [savingTitle, setSavingTitle] = useState(false)
 
   useEffect(() => {
     if (!journalId) return
@@ -79,27 +69,57 @@ export function JournalDetailPage() {
     }
   }, [journalId])
 
-  const headerDate = useMemo(() => {
-    if (!detail?.entries.length) return null
-    const first = [...detail.entries]
-      .filter((e) => e.captured_at)
-      .sort((a, b) => (a.captured_at ?? '').localeCompare(b.captured_at ?? ''))[0]
-    return formatHeaderDate(first?.captured_at ?? null)
-  }, [detail])
+  const entries = detail?.entries ?? []
+  const totalEntries = entries.length
+  const entry = entries[currentEntry] ?? null
+  const headerDate = useMemo(
+    () => (entry?.captured_at ? formatHeaderDate(entry.captured_at) : detail?.title ?? ''),
+    [entry, detail],
+  )
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (showMap) return
+      if (editingTitle) return
+      if (e.key === 'ArrowLeft' && currentEntry > 0) setCurrentEntry((i) => i - 1)
+      if (e.key === 'ArrowRight' && currentEntry < totalEntries - 1) setCurrentEntry((i) => i + 1)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [currentEntry, totalEntries, showMap, editingTitle])
 
   const geotagged = useMemo(() => {
-    if (!detail) return []
-    return detail.entries
-      .filter((e): e is JournalEntry & { latitude: number; longitude: number } =>
-        typeof e.latitude === 'number' && typeof e.longitude === 'number',
+    return entries
+      .filter(
+        (e): e is JournalEntry & { latitude: number; longitude: number } =>
+          typeof e.latitude === 'number' && typeof e.longitude === 'number',
       )
       .sort((a, b) => a.entry_order - b.entry_order)
-  }, [detail])
+  }, [entries])
 
   const mapBounds = useMemo(() => {
     if (geotagged.length === 0) return null
     return L.latLngBounds(geotagged.map((e) => [e.latitude, e.longitude]))
   }, [geotagged])
+
+  const commitTitle = async () => {
+    if (!detail) return
+    const trimmed = titleDraft.trim()
+    if (!trimmed || trimmed === detail.title) {
+      setEditingTitle(false)
+      return
+    }
+    setSavingTitle(true)
+    try {
+      const updated = await editJournal(detail.id, { title: trimmed })
+      setDetail(updated)
+      setEditingTitle(false)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to rename journal')
+    } finally {
+      setSavingTitle(false)
+    }
+  }
 
   if (error) {
     return (
@@ -121,8 +141,8 @@ export function JournalDetailPage() {
   }
 
   return (
-    <div className="journal-result-shell">
-      <header className="journal-result-header">
+    <div className="journal-diary-shell">
+      <header className="journal-diary-header">
         <button
           type="button"
           className="journal-picker-back"
@@ -132,11 +152,38 @@ export function JournalDetailPage() {
           <span>Back</span>
         </button>
 
-        <div className="journal-result-titles">
-          <span className="journal-result-date">{headerDate}</span>
-          <span className="journal-result-title-button" style={{ cursor: 'default' }}>
-            <span>{detail.title?.trim() || 'Untitled Journal'}</span>
-          </span>
+        <div className="journal-diary-titles">
+          <span className="journal-diary-date">{headerDate}</span>
+          {editingTitle ? (
+            <input
+              type="text"
+              className="journal-diary-title-input"
+              value={titleDraft}
+              autoFocus
+              disabled={savingTitle}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={() => void commitTitle()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void commitTitle()
+                if (e.key === 'Escape') setEditingTitle(false)
+              }}
+            />
+          ) : (
+            <h2 className="journal-diary-title">
+              <span>{detail.title?.trim() || 'Untitled Journal'}</span>
+              <button
+                type="button"
+                className="journal-diary-title-edit"
+                onClick={() => {
+                  setTitleDraft(detail.title ?? '')
+                  setEditingTitle(true)
+                }}
+                aria-label="Rename journal"
+              >
+                <Pencil size={14} />
+              </button>
+            </h2>
+          )}
         </div>
 
         <button
@@ -151,48 +198,60 @@ export function JournalDetailPage() {
         </button>
       </header>
 
-      <section className="journal-result-entries">
-        {detail.entries.map((entry) => {
-          const tags = collectTags(entry)
-          return (
-            <article key={entry.id} className="journal-result-entry">
-              <div className="journal-result-photo photo-frame photo-frame--coast" />
+      {totalEntries === 0 ? (
+        <div className="journal-empty">
+          <p>This journal has no entries.</p>
+        </div>
+      ) : (
+        <section className="journal-diary-stage">
+          <button
+            type="button"
+            className="journal-diary-arrow journal-diary-arrow--left"
+            onClick={() => setCurrentEntry((i) => Math.max(0, i - 1))}
+            disabled={currentEntry === 0}
+            aria-label="Previous entry"
+          >
+            ‹
+          </button>
 
-              <div className="journal-result-content">
-                <div className="journal-result-location">
-                  <MapPin size={14} />
-                  <span>
-                    {[entry.place_name, entry.city, entry.country].filter(Boolean).join(' · ') || 'Unknown place'}
-                  </span>
-                </div>
+          <DiaryCard entry={entry!} index={currentEntry} total={totalEntries} />
 
-                {tags.length > 0 && (
-                  <div className="journal-result-tags">
-                    {tags.map((tag) => (
-                      <span key={tag} className="journal-result-tag">{humanizeTag(tag)}</span>
-                    ))}
-                  </div>
-                )}
+          <button
+            type="button"
+            className="journal-diary-arrow journal-diary-arrow--right"
+            onClick={() => setCurrentEntry((i) => Math.min(totalEntries - 1, i + 1))}
+            disabled={currentEntry === totalEntries - 1}
+            aria-label="Next entry"
+          >
+            ›
+          </button>
+        </section>
+      )}
 
-                <p className="journal-result-text" style={{ cursor: 'default' }}>
-                  {entry.journal_text || <em>No note recorded.</em>}
-                </p>
-              </div>
-            </article>
-          )
-        })}
-      </section>
+      {totalEntries > 1 ? (
+        <div className="journal-diary-dots">
+          {entries.map((_, idx) => (
+            <button
+              key={idx}
+              type="button"
+              className={`journal-diary-dot${idx === currentEntry ? ' is-active' : ''}`}
+              onClick={() => setCurrentEntry(idx)}
+              aria-label={`Go to entry ${idx + 1}`}
+            />
+          ))}
+        </div>
+      ) : null}
 
       {showMap && (
         <div className="collection-map-overlay" onClick={() => setShowMap(false)}>
           <div className="collection-map-modal" onClick={(e) => e.stopPropagation()}>
             <header className="collection-map-header">
               <div>
-                <h3>{detail.title?.trim() || 'Journal'}</h3>
+                <h3>Journal route map</h3>
                 <p>
-                  {geotagged.length} on map
-                  {detail.entries.length - geotagged.length > 0 &&
-                    ` · ${detail.entries.length - geotagged.length} without GPS`}
+                  {geotagged.length} stops
+                  {entries.length - geotagged.length > 0 &&
+                    ` · ${entries.length - geotagged.length} without GPS`}
                 </p>
               </div>
               <button
@@ -214,7 +273,7 @@ export function JournalDetailPage() {
               ) : (
                 <MapContainer
                   {...(mapBounds
-                    ? { bounds: mapBounds, boundsOptions: { padding: [32, 32] } }
+                    ? { bounds: mapBounds, boundsOptions: { padding: [40, 40] } }
                     : { center: [geotagged[0].latitude, geotagged[0].longitude], zoom: 13 })}
                   scrollWheelZoom={true}
                   style={{ height: '100%', width: '100%' }}
@@ -223,19 +282,32 @@ export function JournalDetailPage() {
                     attribution="&copy; OpenStreetMap"
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                  {geotagged.map((entry, idx) => (
+                  {geotagged.length >= 2 ? (
+                    <Polyline
+                      positions={geotagged.map((e) => [e.latitude, e.longitude])}
+                      pathOptions={{
+                        color: '#2d6a5f',
+                        weight: 3,
+                        opacity: 0.9,
+                        dashArray: '6 8',
+                      }}
+                    />
+                  ) : null}
+                  {geotagged.map((e, idx) => (
                     <Marker
-                      key={entry.id}
-                      position={[entry.latitude, entry.longitude]}
+                      key={e.id}
+                      position={[e.latitude, e.longitude]}
                       icon={numberedPin(idx + 1)}
                     >
-                      <Popup>
-                        <strong>{entry.place_name || entry.city || 'Spot ' + (idx + 1)}</strong>
-                        <br />
-                        {entry.journal_text && (
-                          <span style={{ color: '#475569', fontSize: '0.85em' }}>{entry.journal_text}</span>
-                        )}
-                      </Popup>
+                      <Tooltip direction="top" offset={[0, -16]} opacity={1} permanent={false}>
+                        <div className="journal-map-tooltip">
+                          <strong>{idx + 1}. {e.place_name || e.city || `Stop ${idx + 1}`}</strong>
+                          {[e.city, e.country].filter(Boolean).length > 0 ? (
+                            <p>{[e.city, e.country].filter(Boolean).join(', ')}</p>
+                          ) : null}
+                          {e.journal_text ? <em>{e.journal_text.slice(0, 80)}{e.journal_text.length > 80 ? '…' : ''}</em> : null}
+                        </div>
+                      </Tooltip>
                     </Marker>
                   ))}
                 </MapContainer>
@@ -245,5 +317,39 @@ export function JournalDetailPage() {
         </div>
       )}
     </div>
+  )
+}
+
+function DiaryCard({ entry, index, total }: { entry: JournalEntry; index: number; total: number }) {
+  const tags = collectTags(entry)
+  const location = [entry.place_name, entry.city, entry.country].filter(Boolean).join(' · ') || 'Unknown place'
+
+  return (
+    <article className="journal-diary-card">
+      <header className="journal-diary-card-top">
+        <span className="journal-diary-card-counter">{index + 1} / {total}</span>
+        <span className="journal-diary-card-location">
+          <MapPin size={13} />
+          {location}
+        </span>
+      </header>
+
+      <div className="journal-diary-card-body">
+        <div className="journal-diary-card-photo photo-frame photo-frame--coast" />
+
+        <div className="journal-diary-card-text">
+          {tags.length > 0 && (
+            <div className="journal-result-tags">
+              {tags.map((tag) => (
+                <span key={tag} className="journal-result-tag">{humanizeTag(tag)}</span>
+              ))}
+            </div>
+          )}
+          <p className="journal-diary-card-narrative">
+            {entry.journal_text || <em>No note recorded for this stop.</em>}
+          </p>
+        </div>
+      </div>
+    </article>
   )
 }

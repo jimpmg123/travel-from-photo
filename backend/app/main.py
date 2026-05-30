@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.auth.router import router as auth_router
 from app.routers.gallery import router as gallery_router
+from app.routers.geocode import router as geocode_router
 from app.routers.image import router as image_router
 from app.routers.journal import router as journal_router
 from app.routers.profile import router as profile_router
@@ -43,6 +44,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(journal_router, prefix=API_PREFIX)
     app.include_router(profile_router, prefix=API_PREFIX)
     app.include_router(gallery_router, prefix=API_PREFIX)
+    app.include_router(geocode_router, prefix=API_PREFIX)
 
 
 def create_app() -> FastAPI:

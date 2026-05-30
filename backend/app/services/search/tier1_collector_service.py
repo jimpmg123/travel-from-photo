@@ -63,11 +63,14 @@ def _ocr_signal(processed_path: Path, language_hints: list[str] | None = None) -
             tier=1,
         )
     text = (raw.get("extracted_text") or "").strip()
+    cleaned = text[:255] if text else None
+    if cleaned and not _is_plausible_place_text(cleaned):
+        cleaned = None
     return RawSignal(
         source="vision_ocr",
-        status="resolved" if text else "empty",
+        status="resolved" if cleaned else "empty",
         raw_response=raw,
-        parsed_place_name=text[:255] if text else None,
+        parsed_place_name=cleaned,
         latency_ms=latency,
         tier=1,
     )
@@ -119,6 +122,10 @@ def _calibrate_web_score(raw: dict[str, Any]) -> float:
     return max(float(top_score), 0.55)
 
 
+_NON_PLACE_PREFIXES = ("file:", "image:", "category:", "user:", "talk:", "wikipedia:", "commons:")
+_IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".tiff", ".bmp")
+
+
 def _clean_page_title(title: str) -> str:
     if not title:
         return ""
@@ -126,6 +133,44 @@ def _clean_page_title(title: str) -> str:
         if sep in title:
             title = title.split(sep)[0]
     return title.strip()
+
+
+def _is_plausible_place_text(text: str) -> bool:
+    """Reject text that obviously isn't a place name — file names, URL
+    fragments, OCR garbage, etc. Keeps signal pool clean before we send
+    each one off to Geocoding."""
+    if not text:
+        return False
+    s = text.strip()
+    if len(s) < 3 or len(s) > 80:
+        return False
+    low = s.lower()
+    if any(low.startswith(p) for p in _NON_PLACE_PREFIXES):
+        return False
+    if any(low.endswith(ext) for ext in _IMAGE_EXTENSIONS):
+        return False
+    if "/" in s or "\\" in s or "http" in low:
+        return False
+    # Need at least one alphanumeric-y character (kills pure symbols)
+    if not any(ch.isalnum() for ch in s):
+        return False
+    # Kill mixed-script noise: if more than 2 distinct script families
+    # appear (Latin + Hangul + CJK + Cyrillic + ...) we treat as junk.
+    # OCR mis-reads typically smash 3+ scripts into one short string.
+    families = 0
+    if any("a" <= ch.lower() <= "z" for ch in s):
+        families += 1
+    if any("가" <= ch <= "힣" for ch in s):  # Hangul syllables
+        families += 1
+    if any("一" <= ch <= "鿿" for ch in s):  # CJK ideographs
+        families += 1
+    if any("぀" <= ch <= "ヿ" for ch in s):  # Hiragana/Katakana
+        families += 1
+    if any("Ѐ" <= ch <= "ӿ" for ch in s):  # Cyrillic
+        families += 1
+    if families >= 3:
+        return False
+    return True
 
 
 def _web_signal(original_path: Path) -> RawSignal:
@@ -140,12 +185,17 @@ def _web_signal(original_path: Path) -> RawSignal:
         )
     best_guess = raw.get("best_guess")
     top_entity = raw.get("top_web_entity") or {}
-    place_name = best_guess or top_entity.get("description")
+    candidates = [best_guess, top_entity.get("description")]
+    place_name: str | None = None
+    for cand in candidates:
+        if cand and _is_plausible_place_text(cand):
+            place_name = cand
+            break
     if not place_name:
         pages = raw.get("pages_with_matching_images") or []
         for page in pages:
             cleaned = _clean_page_title(page.get("page_title") or "")
-            if len(cleaned) >= 3:
+            if _is_plausible_place_text(cleaned):
                 place_name = cleaned
                 break
     return RawSignal(
@@ -170,7 +220,7 @@ def _web_extra_signals(raw: dict[str, Any]) -> list[RawSignal]:
 
     for entity in (raw.get("web_entities") or [])[:4]:
         desc = (entity.get("description") or "").strip()
-        if not desc:
+        if not _is_plausible_place_text(desc):
             continue
         key = desc.lower()
         if key in seen:
@@ -189,7 +239,7 @@ def _web_extra_signals(raw: dict[str, Any]) -> list[RawSignal]:
 
     for page in (raw.get("pages_with_matching_images") or [])[:3]:
         cleaned = _clean_page_title(page.get("page_title") or "")
-        if len(cleaned) < 3:
+        if not _is_plausible_place_text(cleaned):
             continue
         key = cleaned.lower()
         if key in seen:

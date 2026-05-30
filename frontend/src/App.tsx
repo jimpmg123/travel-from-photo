@@ -1,13 +1,12 @@
-import { useState } from 'react'
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import './App.css'
 import { useAuth } from './app/context/AuthContext'
 import { GenerationToast } from './app/components/GenerationToast'
 import { TopBar } from './app/components/TopBar'
-import { useGalleryBrowser } from './app/hooks/useGalleryBrowser'
 import { ChatPage } from './app/pages/ChatPage'
+import { CollectionDetailPage } from './app/pages/CollectionDetailPage'
 import { GalleryPage } from './app/pages/GalleryPage'
-import { ImagesPage } from './app/pages/ImagesPage'
 import { JournalCollectionsPage } from './app/pages/JournalCollectionsPage'
 import { JournalDetailPage } from './app/pages/JournalDetailPage'
 import { JournalPage } from './app/pages/JournalPage'
@@ -17,32 +16,64 @@ import { ProfilePage } from './app/pages/ProfilePage'
 import { SearchPage } from './app/pages/SearchPage'
 import { SearchResultsPage } from './app/pages/SearchResultsPage'
 import { SettingsPage } from './app/pages/SettingsPage'
-import { applyCrossImageClusterReweight, retryFailedSearchUpload } from './app/search/api'
+import { analyzeSearchUploads, applyCrossImageClusterReweight, retryFailedSearchUpload } from './app/search/api'
 import { buildSearchResultBundle } from './app/search/data'
-import type { SearchRun } from './app/search/types'
+import type { SearchRun, SearchUploadItem } from './app/search/types'
 
 function App() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { isLoggedIn, user, role, logout } = useAuth()
   const [latestSearchSession, setLatestSearchSession] = useState<SearchRun | null>(null)
-  const {
-    closeImage,
-    galleryState,
-    markGroupUnlocked,
-    navigateImage,
-    openGroup,
-    openImage,
-    renameGroup,
-    selectedGalleryGroup,
-    selectedGalleryImage,
-    toggleGroupLock,
-    unlockedGroupIds,
-  } = useGalleryBrowser()
+  const [searchInFlight, setSearchInFlight] = useState(false)
+  const [readyToast, setReadyToast] = useState<string | null>(null)
+  const readyToastTimer = useRef<number | null>(null)
 
-  const handleRunSearch = (session: SearchRun) => {
-    setLatestSearchSession(session)
-    navigate('/search-results')
+  const handleStartSearch = (input: {
+    uploads: SearchUploadItem[]
+    countryHint: string
+    cityHint: string
+  }) => {
+    if (searchInFlight) return
+    setSearchInFlight(true)
+    const startedFromPath = location.pathname
+    ;(async () => {
+      try {
+        const analyses = await analyzeSearchUploads(input.uploads, {
+          countryHint: input.countryHint,
+          cityHint: input.cityHint,
+        })
+        const bundle = buildSearchResultBundle({
+          countryHint: input.countryHint,
+          cityHint: input.cityHint,
+          uploads: input.uploads,
+          analyses,
+        })
+        setLatestSearchSession({
+          countryHint: input.countryHint,
+          cityHint: input.cityHint,
+          uploads: input.uploads,
+          analyses,
+          bundle,
+        })
+        if (window.location.pathname === startedFromPath && startedFromPath === '/') {
+          navigate('/search-results')
+        } else {
+          setReadyToast('Search results are ready')
+          if (readyToastTimer.current) window.clearTimeout(readyToastTimer.current)
+          readyToastTimer.current = window.setTimeout(() => setReadyToast(null), 6000)
+        }
+      } finally {
+        setSearchInFlight(false)
+      }
+    })()
   }
+
+  useEffect(() => {
+    return () => {
+      if (readyToastTimer.current) window.clearTimeout(readyToastTimer.current)
+    }
+  }, [])
 
   const handleRetryFailedSearchImage = async (uploadId: string, userHint: string) => {
     if (!latestSearchSession) return
@@ -89,9 +120,32 @@ function App() {
         <TopBar onLogout={() => { logout(); navigate('/sign-in') }} />
         <GenerationToast />
 
+        {searchInFlight && location.pathname !== '/' ? (
+          <div className="search-bg-banner">
+            <span className="search-bg-banner-spinner" />
+            <span>Searching in the background — feel free to keep browsing.</span>
+          </div>
+        ) : null}
+
+        {readyToast ? (
+          <button
+            type="button"
+            className="search-ready-toast"
+            onClick={() => {
+              setReadyToast(null)
+              navigate('/search-results')
+            }}
+          >
+            {readyToast} — click to view
+          </button>
+        ) : null}
+
         <main className="page-surface">
           <Routes>
-            <Route path="/" element={<SearchPage onRunSearch={handleRunSearch} />} />
+            <Route
+              path="/"
+              element={<SearchPage onStartSearch={handleStartSearch} isSearching={searchInFlight} />}
+            />
             <Route
               path="/search-results"
               element={
@@ -106,39 +160,8 @@ function App() {
             <Route path="/journal/result/:journalId" element={<JournalResultPage />} />
             <Route path="/journal/collections" element={<JournalCollectionsPage />} />
             <Route path="/journal/collections/:journalId" element={<JournalDetailPage />} />
-            <Route
-              path="/gallery"
-              element={
-                <GalleryPage
-                  groups={galleryState}
-                  unlockedGroupIds={unlockedGroupIds}
-                  onMarkUnlocked={markGroupUnlocked}
-                  onRenameGroup={renameGroup}
-                  onViewImages={(group) => {
-                    openGroup(group)
-                    navigate('/gallery/images')
-                  }}
-                />
-              }
-            />
-            <Route
-              path="/gallery/images"
-              element={
-                selectedGalleryGroup ? (
-                  <ImagesPage
-                    group={selectedGalleryGroup}
-                    selectedImage={selectedGalleryImage}
-                    onBack={() => navigate('/gallery')}
-                    onOpenImage={openImage}
-                    onCloseImage={closeImage}
-                    onNavigateImage={navigateImage}
-                    onToggleLock={toggleGroupLock}
-                  />
-                ) : (
-                  <Navigate to="/gallery" replace />
-                )
-              }
-            />
+            <Route path="/gallery" element={<GalleryPage />} />
+            <Route path="/gallery/collection/:collectionName" element={<CollectionDetailPage />} />
             <Route
               path="/profile"
               element={<ProfilePage user={user} isLoggedIn={isLoggedIn} role={role} />}

@@ -8,6 +8,11 @@ function authHeaders(): Record<string, string> {
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (res.status === 204) return undefined as unknown as T
+  if (res.status === 401) {
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem('tfp_user')
+    throw new Error('Your session has expired — please sign in again.')
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error((body as { detail?: string }).detail ?? `Request failed (${res.status})`)

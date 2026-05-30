@@ -1,62 +1,74 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, BookText, Check, Library, MapPin, Plus, Sparkles } from 'lucide-react'
 
 import { useJournalJob } from '../context/JournalJobContext'
-import { galleryGroups } from '../data'
-import type { GalleryGroup, GalleryImage } from '../types'
+import { useSavedPlaces } from '../hooks/useSavedPlaces'
+import { absoluteImageUrl, type Collection, type SavedPlace } from '../services/galleryApi'
 
 type PageMode = 'home' | 'pick-collection' | 'pick-photos' | 'just-started'
 
 const MAX_SELECTABLE = 20
 
-const imageHasMetadata = (image: GalleryImage): boolean =>
-  typeof image.latitude === 'number' && typeof image.longitude === 'number'
+const eligibleForJournal = (place: SavedPlace): boolean =>
+  place.image_metadata_id != null && place.has_gps
 
 export function JournalPage() {
   const navigate = useNavigate()
   const { job, isStarting, start } = useJournalJob()
+  const { collections, loading, error } = useSavedPlaces()
   const [mode, setMode] = useState<PageMode>('home')
-  const [selectedCollection, setSelectedCollection] = useState<GalleryGroup | null>(null)
-  const [selectedImageIds, setSelectedImageIds] = useState<Set<number>>(new Set())
-  const [noMetaWarning, setNoMetaWarning] = useState<string | null>(null)
+  const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null)
+  const [selectedPlaceIds, setSelectedPlaceIds] = useState<Set<number>>(new Set())
+  const [warning, setWarning] = useState<string | null>(null)
 
-  // Reset photo selection whenever the user enters a different collection.
-  const enterPhotoPicker = (group: GalleryGroup) => {
-    setSelectedCollection(group)
-    setSelectedImageIds(new Set())
-    setNoMetaWarning(null)
+  const nonEmptyCollections = useMemo(
+    () => collections.filter((c) => c.saves.length > 0),
+    [collections],
+  )
+
+  const enterPhotoPicker = (collection: Collection) => {
+    setSelectedCollection(collection)
+    setSelectedPlaceIds(new Set())
+    setWarning(null)
     setMode('pick-photos')
   }
 
-  const toggleImage = (image: GalleryImage) => {
-    if (!imageHasMetadata(image)) {
-      setNoMetaWarning(`"${image.title}" doesn't have GPS/timestamp metadata, so it can't be journaled.`)
+  const togglePlace = (place: SavedPlace) => {
+    if (!eligibleForJournal(place)) {
+      const reason = place.image_metadata_id == null
+        ? 'This save predates EXIF storage. Save it again from a new search to make it journal-eligible.'
+        : "No GPS in this photo's EXIF — journal needs location data to map it."
+      setWarning(`"${place.place_name}": ${reason}`)
       return
     }
-    setSelectedImageIds((current) => {
+    setSelectedPlaceIds((current) => {
       const next = new Set(current)
-      if (next.has(image.id)) {
-        next.delete(image.id)
+      if (next.has(place.id)) {
+        next.delete(place.id)
       } else if (next.size < MAX_SELECTABLE) {
-        next.add(image.id)
+        next.add(place.id)
       }
       return next
     })
   }
 
   const handleGenerate = async () => {
-    if (selectedImageIds.size === 0) return
+    if (!selectedCollection) return
+    const eligibleSelected = selectedCollection.saves.filter(
+      (p) => selectedPlaceIds.has(p.id) && eligibleForJournal(p),
+    )
+    const imageIds = eligibleSelected
+      .map((p) => p.image_metadata_id)
+      .filter((id): id is number => id != null)
+    if (imageIds.length === 0) return
     try {
-      await start(Array.from(selectedImageIds))
+      await start(imageIds)
       setMode('just-started')
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to start journal generation.'
-      setNoMetaWarning(message)
+    } catch (e) {
+      setWarning(e instanceof Error ? e.message : 'Failed to start journal generation.')
     }
   }
-
-  const totalCollections = galleryGroups.length
 
   // ----- HOME -----
   if (mode === 'home') {
@@ -73,11 +85,9 @@ export function JournalPage() {
             className="journal-home-tile journal-home-tile--create"
             onClick={() => setMode('pick-collection')}
           >
-            <span className="journal-home-tile-icon">
-              <Plus size={28} />
-            </span>
+            <span className="journal-home-tile-icon"><Plus size={28} /></span>
             <strong>Create Journal</strong>
-            <span className="journal-home-tile-hint">Pick photos from a collection</span>
+            <span className="journal-home-tile-hint">Pick photos from a gallery collection</span>
           </button>
 
           <button
@@ -85,9 +95,7 @@ export function JournalPage() {
             className="journal-home-tile journal-home-tile--browse"
             onClick={() => navigate('/journal/collections')}
           >
-            <span className="journal-home-tile-icon">
-              <Library size={28} />
-            </span>
+            <span className="journal-home-tile-icon"><Library size={28} /></span>
             <strong>Show Journal Collections</strong>
             <span className="journal-home-tile-hint">Saved journals + stats</span>
           </button>
@@ -107,34 +115,54 @@ export function JournalPage() {
           </button>
           <div className="journal-picker-titles">
             <h2>Choose a collection</h2>
-            <p>{totalCollections} collections in your gallery</p>
+            <p>{nonEmptyCollections.length} collection{nonEmptyCollections.length === 1 ? '' : 's'} available</p>
           </div>
         </header>
 
-        {galleryGroups.length === 0 ? (
+        {loading ? (
+          <p className="gallery-empty-line">Loading collections...</p>
+        ) : error ? (
           <div className="gallery-empty">
-            <strong>No collections yet</strong>
+            <strong>Could not load gallery</strong>
+            <p>{error}</p>
+          </div>
+        ) : nonEmptyCollections.length === 0 ? (
+          <div className="gallery-empty">
+            <strong>No collections with photos yet</strong>
             <p>
-              Upload photos through the Search page first — once they land in the gallery you can
-              come back here and build a journal from them.
+              Run a search and save results to Gallery first — then come back here to pick photos
+              for a journal.
             </p>
           </div>
         ) : (
-          <section className="journal-collection-grid">
-            {galleryGroups.map((group) => (
-              <button
-                key={group.id}
-                type="button"
-                className="journal-collection-tile"
-                onClick={() => enterPhotoPicker(group)}
-              >
-                <div className={`photo-frame photo-frame--${group.images[0]?.theme ?? group.theme}`} />
-                <div className="journal-collection-info">
-                  <strong>{group.title}</strong>
-                  <span>{group.city}, {group.country} · {group.images.length} photos</span>
-                </div>
-              </button>
-            ))}
+          <section className="gallery-grid gallery-grid--groups">
+            {nonEmptyCollections.map((collection) => {
+              const cover = collection.saves[0]
+              const coverUrl = absoluteImageUrl(cover?.image_url ?? null)
+              const eligibleCount = collection.saves.filter(eligibleForJournal).length
+              return (
+                <button
+                  key={collection.name}
+                  type="button"
+                  className="gallery-collection-card"
+                  onClick={() => enterPhotoPicker(collection)}
+                >
+                  <div className="gallery-collection-cover">
+                    {coverUrl ? <img src={coverUrl} alt={collection.name} /> : (
+                      <div className="gallery-collection-cover-empty">Empty collection</div>
+                    )}
+                  </div>
+                  <div className="gallery-collection-meta">
+                    <h3>{collection.name}</h3>
+                    <p>
+                      {collection.saves.length} place{collection.saves.length === 1 ? '' : 's'}
+                      {' · '}
+                      {eligibleCount} journal-ready
+                    </p>
+                  </div>
+                </button>
+              )
+            })}
           </section>
         )}
       </div>
@@ -143,63 +171,71 @@ export function JournalPage() {
 
   // ----- PHOTO PICKER -----
   if (mode === 'pick-photos' && selectedCollection !== null) {
-    const eligibleCount = selectedCollection.images.filter(imageHasMetadata).length
-    const selectedCount = selectedImageIds.size
+    const eligibleCount = selectedCollection.saves.filter(eligibleForJournal).length
+    const selectedCount = selectedPlaceIds.size
     const canGenerate = selectedCount > 0 && !isStarting
 
     return (
       <div className="journal-picker-shell">
         <header className="journal-picker-header">
-          <button type="button" className="journal-picker-back" onClick={() => setMode('pick-collection')}>
+          <button
+            type="button"
+            className="journal-picker-back"
+            onClick={() => setMode('pick-collection')}
+          >
             <ArrowLeft size={16} />
             <span>Back</span>
           </button>
           <div className="journal-picker-titles">
-            <h2>{selectedCollection.title}</h2>
+            <h2>{selectedCollection.name}</h2>
             <p>
-              Select up to {MAX_SELECTABLE} photos · {eligibleCount} with GPS/timestamp · {selectedCount} selected
+              Select up to {MAX_SELECTABLE} photos · {eligibleCount} journal-ready · {selectedCount} selected
             </p>
           </div>
           <button
             type="button"
             className="button-primary journal-generate-button"
-            onClick={handleGenerate}
+            onClick={() => void handleGenerate()}
             disabled={!canGenerate}
           >
             <Sparkles size={14} />
-            <span>Generate Journal</span>
+            <span>{isStarting ? 'Starting...' : 'Generate Journal'}</span>
           </button>
         </header>
 
-        {noMetaWarning && (
+        {warning && (
           <div className="journal-warning-banner">
-            <span>{noMetaWarning}</span>
-            <button type="button" onClick={() => setNoMetaWarning(null)} aria-label="Dismiss warning">
-              ×
-            </button>
+            <span>{warning}</span>
+            <button type="button" onClick={() => setWarning(null)} aria-label="Dismiss warning">×</button>
           </div>
         )}
 
         <section className="journal-photo-grid">
-          {selectedCollection.images.map((image) => {
-            const has = imageHasMetadata(image)
-            const selected = selectedImageIds.has(image.id)
+          {selectedCollection.saves.map((place) => {
+            const eligible = eligibleForJournal(place)
+            const selected = selectedPlaceIds.has(place.id)
+            const url = absoluteImageUrl(place.image_url)
             return (
               <button
-                key={image.id}
+                key={place.id}
                 type="button"
-                className={`journal-photo-tile ${has ? '' : 'is-disabled'} ${selected ? 'is-selected' : ''}`}
-                onClick={() => toggleImage(image)}
+                className={`journal-photo-tile ${eligible ? '' : 'is-disabled'} ${selected ? 'is-selected' : ''}`}
+                onClick={() => togglePlace(place)}
                 aria-pressed={selected}
-                title={has ? image.title : `${image.title} (no metadata)`}
+                title={place.place_name}
               >
-                <div className={`photo-frame photo-frame--${image.theme}`} />
-                {has && (
+                {url ? (
+                  <img src={url} alt={place.place_name} className="journal-photo-tile-img" />
+                ) : (
+                  <div className="journal-photo-tile-empty">No image</div>
+                )}
+                {eligible && (
                   <span className="journal-photo-checkbox" aria-hidden="true">
                     {selected ? <Check size={14} /> : null}
                   </span>
                 )}
-                {!has && <span className="journal-photo-nometa">no metadata</span>}
+                {!eligible && <span className="journal-photo-nometa">no GPS</span>}
+                <span className="journal-photo-caption">{place.place_name}</span>
               </button>
             )
           })}
@@ -208,19 +244,18 @@ export function JournalPage() {
     )
   }
 
-  // ----- JUST STARTED (brief message before user navigates away) -----
+  // ----- JUST STARTED -----
   if (mode === 'just-started') {
-    const totalSelected = selectedImageIds.size
     return (
       <div className="journal-started-shell">
         <BookText size={36} />
         <h2>AI is generating your journal…</h2>
-        <p>You can keep using the app — the progress popup will stay with you.</p>
+        <p>You can keep using the app — the progress popup stays with you.</p>
         <div className="journal-started-meta">
-          <span>
-            <MapPin size={14} /> {selectedCollection?.title}
-          </span>
-          <span>{totalSelected} photos queued</span>
+          {selectedCollection && (
+            <span><MapPin size={14} /> {selectedCollection.name}</span>
+          )}
+          <span>{selectedPlaceIds.size} photos queued</span>
           {job && <span>Status: {job.status}</span>}
         </div>
         <div className="journal-started-actions">

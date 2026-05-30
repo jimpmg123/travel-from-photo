@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { createSavedPlace, fetchCollections } from '../../services/galleryApi'
 import type { Candidate, SearchImageResult, SearchResultBundle } from '../types'
+import { EditableMatchMap } from './EditableMatchMap'
+
+type TopMatchEdit = {
+  placeName?: string
+  latitude?: number
+  longitude?: number
+}
 
 type SearchResultsProps = {
   bundle: SearchResultBundle
@@ -24,8 +32,6 @@ const SOURCE_TAG_LABEL: Record<string, string> = {
   vision_ocr: 'OCR',
   gpt4o_main: 'AI vision',
 }
-
-const GALLERY_STORAGE_KEY = 'tfp_gallery_saves'
 
 function toPercent(score: number | null | undefined): number {
   if (score == null) return 0
@@ -60,22 +66,9 @@ function deriveTags(candidate: Candidate): string[] {
   return out
 }
 
-function saveToLocalGallery(payload: { candidate: Candidate; imageId: string; previewUrl: string; imageName: string }) {
-  try {
-    const raw = localStorage.getItem(GALLERY_STORAGE_KEY)
-    const existing = raw ? JSON.parse(raw) : []
-    const entry = {
-      savedAt: new Date().toISOString(),
-      imageId: payload.imageId,
-      imageName: payload.imageName,
-      previewUrl: payload.previewUrl,
-      candidate: payload.candidate,
-    }
-    const next = Array.isArray(existing) ? [entry, ...existing] : [entry]
-    localStorage.setItem(GALLERY_STORAGE_KEY, JSON.stringify(next))
-  } catch {
-    // localStorage may be unavailable in restricted contexts; silently skip.
-  }
+async function fetchPreviewAsBlob(previewUrl: string): Promise<Blob> {
+  const res = await fetch(previewUrl)
+  return res.blob()
 }
 
 function MapPinIcon({ size = 12 }: { size?: number }) {
@@ -93,6 +86,140 @@ function ChevronIcon({ direction }: { direction: 'left' | 'right' }) {
     <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d={path} />
     </svg>
+  )
+}
+
+function SaveDialog({
+  open,
+  candidate,
+  previewUrl,
+  imageName,
+  collections,
+  saving,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean
+  candidate: Candidate | null
+  previewUrl: string
+  imageName: string
+  collections: string[]
+  saving: boolean
+  onClose: () => void
+  onConfirm: (collectionName: string) => Promise<void> | void
+}) {
+  const ref = useRef<HTMLDialogElement>(null)
+  const [selected, setSelected] = useState<string>('My Gallery')
+  const [newName, setNewName] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  useEffect(() => {
+    const dialog = ref.current
+    if (!dialog) return
+    if (open && !dialog.open) dialog.showModal()
+    else if (!open && dialog.open) dialog.close()
+  }, [open])
+
+  useEffect(() => {
+    if (open) {
+      const suggestedCity = candidate?.city?.trim() || null
+      if (suggestedCity && collections.includes(suggestedCity)) {
+        setSelected(suggestedCity)
+        setCreating(false)
+        setNewName('')
+      } else if (suggestedCity) {
+        setCreating(true)
+        setNewName(suggestedCity)
+        setSelected(collections[0] ?? 'My Gallery')
+      } else {
+        setSelected(collections[0] ?? 'My Gallery')
+        setCreating(false)
+        setNewName('')
+      }
+    }
+  }, [open, collections, candidate])
+
+  if (!candidate) return null
+
+  const handleConfirm = async () => {
+    const target = creating ? newName.trim() : selected
+    if (!target) return
+    await onConfirm(target)
+  }
+
+  return (
+    <dialog
+      ref={ref}
+      className="save-dialog"
+      onClose={onClose}
+      onClick={(e) => {
+        if (e.target === ref.current) onClose()
+      }}
+    >
+      <div className="save-dialog-body">
+        <header className="save-dialog-header">
+          <h3>Save to Gallery</h3>
+          <button type="button" className="search-modal-close" onClick={onClose}>×</button>
+        </header>
+        <div className="save-dialog-preview">
+          <img src={previewUrl} alt={imageName} />
+          <div>
+            <strong>{candidate.place_name ?? 'Unnamed location'}</strong>
+            <p>{locationLine(candidate)}</p>
+          </div>
+        </div>
+
+        <div className="save-dialog-section">
+          <p className="save-dialog-label">Collection</p>
+          {!creating ? (
+            <>
+              {collections.length > 0 ? (
+                <div className="save-dialog-collections">
+                  {collections.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      className={`save-dialog-collection-pill${selected === name ? ' is-selected' : ''}`}
+                      onClick={() => setSelected(name)}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="save-dialog-empty">No collections yet — defaults to "My Gallery".</p>
+              )}
+              <button type="button" className="save-dialog-new-link" onClick={() => setCreating(true)}>
+                + New collection
+              </button>
+            </>
+          ) : (
+            <div className="save-dialog-new-row">
+              <input
+                type="text"
+                autoFocus
+                placeholder="e.g. Jeju 2024"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
+              <button type="button" className="button-secondary" onClick={() => setCreating(false)}>Cancel</button>
+            </div>
+          )}
+        </div>
+
+        <div className="save-dialog-actions">
+          <button type="button" className="button-secondary" onClick={onClose} disabled={saving}>Cancel</button>
+          <button
+            type="button"
+            className="button-primary"
+            disabled={saving || (creating && !newName.trim())}
+            onClick={() => void handleConfirm()}
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </dialog>
   )
 }
 
@@ -197,6 +324,8 @@ function ImageResultBlock({
   retryHint,
   retryDisabled,
   showResearchPanel,
+  edit,
+  onChangeEdit,
   onToggleResearchPanel,
   onChangeRetryHint,
   onRetry,
@@ -209,6 +338,8 @@ function ImageResultBlock({
   retryHint: string
   retryDisabled: boolean
   showResearchPanel: boolean
+  edit: TopMatchEdit
+  onChangeEdit: (patch: TopMatchEdit) => void
   onToggleResearchPanel: () => void
   onChangeRetryHint: (value: string) => void
   onRetry: () => void
@@ -220,8 +351,34 @@ function ImageResultBlock({
   const alternates = candidates.slice(1, 4)
   const verdict = result.verdict ?? 'failed'
   const isConfident = verdict === 'confident'
-  const mapUrl = top ? mapEmbedUrl(top) : null
-  const tags = top ? deriveTags(top) : []
+
+  const effectiveTop: Candidate | null = top
+    ? {
+        ...top,
+        place_name: edit.placeName ?? top.place_name,
+        latitude: edit.latitude ?? top.latitude,
+        longitude: edit.longitude ?? top.longitude,
+      }
+    : null
+  const tags = effectiveTop ? deriveTags(effectiveTop) : []
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const [isMapEditable, setIsMapEditable] = useState(false)
+
+  const startNameEdit = () => {
+    setNameDraft(effectiveTop?.place_name ?? effectiveTop?.formatted_address ?? '')
+    setIsEditingName(true)
+  }
+  const commitNameEdit = () => {
+    const trimmed = nameDraft.trim()
+    if (trimmed && trimmed !== effectiveTop?.place_name) {
+      onChangeEdit({ placeName: trimmed })
+    }
+    setIsEditingName(false)
+  }
+  const cancelNameEdit = () => {
+    setIsEditingName(false)
+  }
 
   return (
     <article className="search-image-block">
@@ -237,15 +394,28 @@ function ImageResultBlock({
         </span>
       </header>
 
-      {top ? (
+      {effectiveTop ? (
         <>
           <div className="top-match-card">
             <div className="match-map">
-              {mapUrl ? (
-                <iframe src={mapUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" title={top.place_name ?? 'Map'} allowFullScreen />
-              ) : (
-                <div className="match-map-placeholder">No coordinates available.</div>
-              )}
+              <EditableMatchMap
+                latitude={effectiveTop.latitude ?? null}
+                longitude={effectiveTop.longitude ?? null}
+                placeName={effectiveTop.place_name ?? null}
+                editable={isMapEditable}
+                onPick={(lat, lng, suggested) => {
+                  const patch: TopMatchEdit = { latitude: lat, longitude: lng }
+                  if (suggested?.placeName) patch.placeName = suggested.placeName
+                  onChangeEdit(patch)
+                }}
+              />
+              <button
+                type="button"
+                className={`match-map-edit-toggle${isMapEditable ? ' is-active' : ''}`}
+                onClick={() => setIsMapEditable((v) => !v)}
+              >
+                {isMapEditable ? 'Done' : 'Pick on map'}
+              </button>
             </div>
 
             <div className="match-right">
@@ -256,16 +426,42 @@ function ImageResultBlock({
               <div className="match-info">
                 <div className="match-info-head">
                   <div className="match-info-text">
-                    <h3 className="match-name">
-                      {top.place_name ?? top.formatted_address ?? 'Unnamed location'}
-                    </h3>
+                    {isEditingName ? (
+                      <input
+                        type="text"
+                        className="match-name-input"
+                        value={nameDraft}
+                        autoFocus
+                        onChange={(e) => setNameDraft(e.target.value)}
+                        onBlur={commitNameEdit}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitNameEdit()
+                          if (e.key === 'Escape') cancelNameEdit()
+                        }}
+                      />
+                    ) : (
+                      <h3 className="match-name">
+                        <span>{effectiveTop.place_name ?? effectiveTop.formatted_address ?? 'Unnamed location'}</span>
+                        <button
+                          type="button"
+                          className="match-name-edit-btn"
+                          onClick={startNameEdit}
+                          aria-label="Edit place name"
+                        >
+                          ✎
+                        </button>
+                      </h3>
+                    )}
                     <p className="match-location">
                       <MapPinIcon />
-                      {locationLine(top)}
+                      {locationLine(effectiveTop)}
                     </p>
+                    {(edit.placeName !== undefined || edit.latitude !== undefined) ? (
+                      <p className="match-edit-note">Edited — your changes will be saved with this place.</p>
+                    ) : null}
                   </div>
                   <div className="match-score">
-                    <div className="match-score-value">{toPercent(top.aggregated_score)}%</div>
+                    <div className="match-score-value">{toPercent(effectiveTop.aggregated_score)}%</div>
                     <div className="match-score-label">match</div>
                   </div>
                 </div>
@@ -282,7 +478,7 @@ function ImageResultBlock({
                   <button
                     type="button"
                     className="button-primary"
-                    onClick={() => onSaveCandidate(top)}
+                    onClick={() => onSaveCandidate(effectiveTop)}
                   >
                     Save to Gallery
                   </button>
@@ -413,8 +609,30 @@ export function SearchResults({
   const [openResearchFor, setOpenResearchFor] = useState<string | null>(null)
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [modalCandidate, setModalCandidate] = useState<Candidate | null>(null)
+  const [topEdits, setTopEdits] = useState<Record<string, TopMatchEdit>>({})
   const [toast, setToast] = useState<string | null>(null)
   const toastTimerRef = useRef<number | null>(null)
+  const [collections, setCollections] = useState<string[]>([])
+  const [saveDialogState, setSaveDialogState] = useState<{
+    candidate: Candidate
+    result: SearchImageResult
+  } | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchCollections()
+      .then((cols) => {
+        if (cancelled) return
+        setCollections(cols.map((c) => c.name))
+      })
+      .catch(() => {
+        // unauthorized or backend down — leave empty, dialog will allow new name
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const total = bundle.results.length
   const safeIndex = Math.min(currentIndex, Math.max(total - 1, 0))
@@ -440,13 +658,83 @@ export function SearchResults({
   }
 
   const handleSaveCandidate = (candidate: Candidate, result: SearchImageResult) => {
-    saveToLocalGallery({
-      candidate,
-      imageId: result.id,
-      previewUrl: result.previewUrl,
-      imageName: result.imageName,
-    })
-    showToast(`Saved "${candidate.place_name ?? 'this location'}" to your gallery`)
+    setSaveDialogState({ candidate, result })
+  }
+
+  const [savingAll, setSavingAll] = useState(false)
+
+  const handleSaveAll = async () => {
+    const targets: { candidate: Candidate; result: SearchImageResult; collection: string }[] = []
+    for (const result of bundle.results) {
+      const cands = result.candidates ?? []
+      const top = cands[0]
+      if (!top) continue
+      const collection = (top.city?.trim() || top.country?.trim() || 'My Gallery').slice(0, 120)
+      targets.push({ candidate: top, result, collection })
+    }
+    if (targets.length === 0) {
+      showToast('No results to save')
+      return
+    }
+    setSavingAll(true)
+    let savedCount = 0
+    const newCollections = new Set(collections)
+    for (const { candidate, result, collection } of targets) {
+      try {
+        const blob = await fetchPreviewAsBlob(result.previewUrl)
+        await createSavedPlace({
+          imageBlob: blob,
+          imageName: result.imageName,
+          placeName: candidate.place_name ?? candidate.formatted_address ?? 'Unnamed place',
+          collectionName: collection,
+          formattedAddress: candidate.formatted_address ?? null,
+          country: candidate.country ?? null,
+          city: candidate.city ?? null,
+          latitude: candidate.latitude ?? null,
+          longitude: candidate.longitude ?? null,
+        })
+        savedCount += 1
+        newCollections.add(collection)
+      } catch {
+        // continue with remaining
+      }
+    }
+    setCollections(Array.from(newCollections))
+    setSavingAll(false)
+    showToast(
+      savedCount === targets.length
+        ? `Saved all ${savedCount} places, grouped by city`
+        : `Saved ${savedCount} of ${targets.length} places`,
+    )
+  }
+
+  const handleConfirmSave = async (collectionName: string) => {
+    if (!saveDialogState) return
+    const { candidate, result } = saveDialogState
+    setSaving(true)
+    try {
+      const blob = await fetchPreviewAsBlob(result.previewUrl)
+      await createSavedPlace({
+        imageBlob: blob,
+        imageName: result.imageName,
+        placeName: candidate.place_name ?? candidate.formatted_address ?? 'Unnamed place',
+        collectionName,
+        formattedAddress: candidate.formatted_address ?? null,
+        country: candidate.country ?? null,
+        city: candidate.city ?? null,
+        latitude: candidate.latitude ?? null,
+        longitude: candidate.longitude ?? null,
+      })
+      if (!collections.includes(collectionName)) {
+        setCollections((cur) => [...cur, collectionName])
+      }
+      showToast(`Saved "${candidate.place_name ?? 'this location'}" to ${collectionName}`)
+      setSaveDialogState(null)
+    } catch (err) {
+      showToast(err instanceof Error ? `Save failed: ${err.message}` : 'Save failed')
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (!current) {
@@ -466,6 +754,16 @@ export function SearchResults({
         </div>
         <div className="results-heading-side">
           <p className="section-copy">{bundle.subheading}</p>
+          {bundle.results.length > 0 ? (
+            <button
+              type="button"
+              className="button-primary results-save-all"
+              onClick={() => void handleSaveAll()}
+              disabled={savingAll}
+            >
+              {savingAll ? 'Saving all...' : `Save all to Gallery (${bundle.results.length})`}
+            </button>
+          ) : null}
         </div>
       </section>
 
@@ -503,6 +801,10 @@ export function SearchResults({
         retryHint={retryHints[current.id] ?? ''}
         retryDisabled={retryingId === current.id}
         showResearchPanel={openResearchFor === current.id}
+        edit={topEdits[current.id] ?? {}}
+        onChangeEdit={(patch) =>
+          setTopEdits((cur) => ({ ...cur, [current.id]: { ...cur[current.id], ...patch } }))
+        }
         onToggleResearchPanel={() =>
           setOpenResearchFor((cur) => (cur === current.id ? null : current.id))
         }
@@ -521,6 +823,17 @@ export function SearchResults({
         open={modalCandidate !== null}
         onClose={() => setModalCandidate(null)}
         onSave={(c) => handleSaveCandidate(c, current)}
+      />
+
+      <SaveDialog
+        open={saveDialogState !== null}
+        candidate={saveDialogState?.candidate ?? null}
+        previewUrl={saveDialogState?.result.previewUrl ?? ''}
+        imageName={saveDialogState?.result.imageName ?? ''}
+        collections={collections}
+        saving={saving}
+        onClose={() => setSaveDialogState(null)}
+        onConfirm={handleConfirmSave}
       />
 
       {toast ? <div className="gallery-toast">{toast}</div> : null}

@@ -1,24 +1,17 @@
-import { useEffect, useState, type ChangeEvent } from 'react'
+import { useState, type ChangeEvent } from 'react'
 
-import { analyzeSearchUploads } from '../search/api'
-import { buildSearchResultBundle, formatFileSize, maxUploadSizeBytes } from '../search/data'
+import { SearchLoadingOverlay } from '../search/components/SearchLoadingOverlay'
+import { formatFileSize, maxUploadSizeBytes } from '../search/data'
 import type { SearchPageProps, SearchUploadItem } from '../search/types'
 import { getUploadValidationError } from '../search/utils'
 
-export function SearchPage({ onRunSearch }: SearchPageProps) {
+export function SearchPage({ onStartSearch, isSearching }: SearchPageProps) {
   const [countryHint, setCountryHint] = useState('')
   const [cityHint, setCityHint] = useState('')
   const [uploads, setUploads] = useState<SearchUploadItem[]>([])
-  const [isSearching, setIsSearching] = useState(false)
   const [uploadError, setUploadError] = useState('')
 
   const isReady = uploads.length > 0 && !isSearching
-
-  useEffect(() => {
-    return () => {
-      uploads.forEach((upload) => URL.revokeObjectURL(upload.previewUrl))
-    }
-  }, [uploads])
 
   const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? [])
@@ -51,43 +44,22 @@ export function SearchPage({ onRunSearch }: SearchPageProps) {
     setUploadError('')
   }
 
-  const handleSearch = async () => {
+  const handleSearch = () => {
     if (uploads.length === 0) {
       setUploadError('Upload at least one travel image before running the image search.')
       return
     }
-
     setUploadError('')
-
-    setIsSearching(true)
-
-    try {
-      const country = countryHint.trim()
-      const city = cityHint.trim()
-      const analyses = await analyzeSearchUploads(uploads, {
-        countryHint: country,
-        cityHint: city,
-      })
-
-      onRunSearch({
-        countryHint: country,
-        cityHint: city,
-        uploads,
-        analyses,
-        bundle: buildSearchResultBundle({
-          countryHint: country,
-          cityHint: city,
-          uploads,
-          analyses,
-        }),
-      })
-    } finally {
-      setIsSearching(false)
-    }
+    onStartSearch({
+      uploads,
+      countryHint: countryHint.trim(),
+      cityHint: cityHint.trim(),
+    })
   }
 
   return (
     <div className="search-main-shell search-main-shell--hero">
+      {isSearching ? <SearchLoadingOverlay /> : null}
       <section className="search-hero-shell">
         <div className="search-hero-copy">
           <h1 className="search-page-title">Search</h1>

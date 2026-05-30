@@ -138,7 +138,12 @@ export type SearchResultBundle = {
 }
 
 export type SearchPageProps = {
-  onRunSearch: (session: SearchRun) => void
+  onStartSearch: (input: {
+    uploads: SearchUploadItem[]
+    countryHint: string
+    cityHint: string
+  }) => void
+  isSearching: boolean
 }
 
 export type SearchResultsPageProps = {
