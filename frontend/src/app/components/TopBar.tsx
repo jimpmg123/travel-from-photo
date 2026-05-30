@@ -9,6 +9,7 @@ import {
   MessageCircle,
   Search,
   Settings,
+  Shield,
   User,
   X,
 } from 'lucide-react'
@@ -23,6 +24,7 @@ const navPath: Record<string, string> = {
   'live-chat': '/chat',
   profile: '/profile',
   settings: '/settings',
+  admin: '/admin',
 }
 
 const navIcons: Record<string, LucideIcon> = {
@@ -32,6 +34,7 @@ const navIcons: Record<string, LucideIcon> = {
   'live-chat': MessageCircle,
   profile: User,
   settings: Settings,
+  admin: Shield,
 }
 
 function getActiveNavId(pathname: string): string {
@@ -41,6 +44,7 @@ function getActiveNavId(pathname: string): string {
   if (pathname === '/chat') return 'live-chat'
   if (pathname === '/profile') return 'profile'
   if (pathname === '/settings') return 'settings'
+  if (pathname === '/admin') return 'admin'
   return ''
 }
 
@@ -119,7 +123,7 @@ export function TopBar({ onLogout }: TopBarProps) {
       </header>
 
       <nav className="desktop-side-nav" aria-label="Primary desktop">
-        {navItems.map((item) => {
+        {navItems.filter((item) => item.id !== 'admin' || role === 'admin').map((item) => {
           const Icon = navIcons[item.id]
           return (
             <button
@@ -156,7 +160,7 @@ export function TopBar({ onLogout }: TopBarProps) {
         aria-label="Mobile primary"
         aria-hidden={!isMobileNavOpen}
       >
-        {navItems.map((item) => {
+        {navItems.filter((item) => item.id !== 'admin' || role === 'admin').map((item) => {
           const Icon = navIcons[item.id]
           return (
             <button

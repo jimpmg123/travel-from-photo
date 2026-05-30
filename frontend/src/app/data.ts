@@ -14,6 +14,7 @@ export const navItems: NavItem[] = [
   { id: 'live-chat', label: 'Chat',     hint: 'live chat among users' },
   { id: 'profile',   label: 'Profile',  hint: 'account info' },
   { id: 'settings',  label: 'Settings', hint: 'account & preferences' },
+  { id: 'admin',     label: 'Admin',    hint: 'moderation tools' },
 ]
 
 export const metrics: Metric[] = [

@@ -9,7 +9,8 @@ export type PageId =
   | 'images'
   | 'live-chat'
   | 'journal'
-  | 'settings';
+  | 'settings'
+  | 'admin';
 
 export type PageNavigator = (page: PageId) => void
 

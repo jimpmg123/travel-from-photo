@@ -1,16 +1,63 @@
-import { adminQueue, profileNotes } from '../data'
-import { SectionIntro } from '../components/SectionIntro'
-import { WorkflowList } from '../components/WorkflowList'
-import type { AuthUser, Role } from '../types'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Mail, Shield, UserRound } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { getCurrentProfile, updateProfile, type ProfilePayload } from '../services/socialApi'
 
-type ProfilePageProps = {
-  user: AuthUser | null
-  isLoggedIn: boolean
-  role: Role
-}
+type EditableProfile = Pick<ProfilePayload, 'firstName' | 'lastName' | 'email' | 'bio'>
 
-export function ProfilePage({ user, isLoggedIn, role }: ProfilePageProps) {
-  const displayName = user ? `${user.firstName} ${user.lastName}`.trim() : 'Guest'
+export function ProfilePage() {
+  const { user, role } = useAuth()
+  const [profile, setProfile] = useState<EditableProfile>({
+    firstName: user?.firstName ?? '',
+    lastName: user?.lastName ?? '',
+    email: user?.email ?? '',
+    bio: '',
+  })
+  const [statusMessage, setStatusMessage] = useState('Loading profile...')
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    let ignore = false
+    getCurrentProfile()
+      .then((payload) => {
+        if (!ignore) {
+          setProfile({
+            firstName: payload.firstName,
+            lastName: payload.lastName,
+            email: payload.email,
+            bio: payload.bio ?? '',
+          })
+          setStatusMessage('Profile loaded from the backend.')
+        }
+      })
+      .catch((error: Error) => {
+        if (!ignore) setStatusMessage(error.message)
+      })
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    try {
+      const saved = await updateProfile(profile)
+      setProfile({
+        firstName: saved.firstName,
+        lastName: saved.lastName,
+        email: saved.email,
+        bio: saved.bio ?? '',
+      })
+      setStatusMessage('Profile saved successfully.')
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : 'Failed to save profile.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const displayName = `${profile.firstName} ${profile.lastName}`.trim() || 'Traveler'
 
   return (
     <div className="stack-xl">
@@ -20,75 +67,58 @@ export function ProfilePage({ user, isLoggedIn, role }: ProfilePageProps) {
           <h2>Account and saved context</h2>
         </div>
         <p className="section-copy">
-          This page reserves space for login status, preferences, private history controls, and an
-          admin view if needed.
+          Manage your profile data and connect to settings, live chat, and admin tools.
         </p>
       </section>
 
-      <section className="profile-grid">
+      <section className="profile-grid b-track-grid">
         <article className="panel profile-card">
-          <div className="avatar-ring">
-            <span>{user ? `${user.firstName[0] ?? ''}${user.lastName[0] ?? ''}` : '?'}</span>
-          </div>
+          <div className="avatar-ring"><span>{displayName.slice(0, 2).toUpperCase()}</span></div>
           <div>
             <h3>{displayName}</h3>
-            <p className="muted-copy">
-              {isLoggedIn ? 'Signed in.' : 'Browsing in guest preview mode.'}
-            </p>
+            <p className="muted-copy">Signed in as {role === 'admin' ? 'Admin' : 'Traveler'}.</p>
           </div>
-          {user && (
-            <div className="summary-list">
-              <span>ID: {user.userId}</span>
-              <span>Email: {user.email}</span>
-            </div>
-          )}
-          <div className="badge-row">
-            <span className="pill">{role === 'traveler' ? 'Traveler' : 'Admin'} view</span>
-            <span className="pill">{isLoggedIn ? 'Gallery enabled' : 'Gallery locked'}</span>
+          <div className="summary-list">
+            <span><UserRound size={16} /> ID: {user?.userId ?? 'unknown'}</span>
+            <span><Mail size={16} /> {profile.email}</span>
+            <span><Shield size={16} /> Account status: Active</span>
+          </div>
+          <div className="profile-actions">
+            <Link className="button-secondary" to="/settings">Open settings</Link>
+            <Link className="button-secondary" to="/chat">Open live chat</Link>
+            {role === 'admin' ? <Link className="button-secondary" to="/admin">Open admin</Link> : null}
           </div>
         </article>
 
         <article className="panel content-panel">
-          <SectionIntro
-            title="Saved preferences"
-            detail="Inputs here can later personalize search defaults and routing behavior."
-          />
-          <WorkflowList items={profileNotes} compact />
-        </article>
-
-        <article className="panel content-panel">
-          <SectionIntro
-            title="Recent activity snapshot"
-            detail="A simple summary area for uploads, saved places, and restaurant lookups."
-          />
-          <div className="result-grid">
-            <div className="result-card">
-              <span className="result-label">Uploads</span>
-              <strong>4 recent photos</strong>
-              <p>Landmark and food memories are mixed into the same personal timeline.</p>
+          <div className="section-mini">
+            <p className="eyebrow">Editable profile</p>
+            <h3>Profile information</h3>
+            <p className="muted-copy">Connected to GET /api/users/me and PUT /api/profile.</p>
+          </div>
+          <div className="form-stack">
+            <div className="field-grid">
+              <label className="field">
+                <span>First name</span>
+                <input value={profile.firstName} onChange={(e) => setProfile((p) => ({ ...p, firstName: e.target.value }))} />
+              </label>
+              <label className="field">
+                <span>Last name</span>
+                <input value={profile.lastName} onChange={(e) => setProfile((p) => ({ ...p, lastName: e.target.value }))} />
+              </label>
             </div>
-            <div className="result-card">
-              <span className="result-label">Saved routes</span>
-              <strong>2 draft guides</strong>
-              <p>Reserved for future directions and shareable itineraries.</p>
-            </div>
-            <div className="result-card">
-              <span className="result-label">Gallery access</span>
-              <strong>4 grouped collections</strong>
-              <p>Open your private gallery to review uploads, rename sets, and browse saved images.</p>
-            </div>
+            <label className="field">
+              <span>Email</span>
+              <input value={profile.email} onChange={(e) => setProfile((p) => ({ ...p, email: e.target.value }))} />
+            </label>
+            <label className="field">
+              <span>Bio</span>
+              <textarea rows={4} value={profile.bio ?? ''} onChange={(e) => setProfile((p) => ({ ...p, bio: e.target.value }))} />
+            </label>
+            <button type="button" className="button-primary" onClick={handleSave} disabled={isSaving}>{isSaving ? 'Saving...' : 'Save profile'}</button>
+            <p className="field-note">{statusMessage}</p>
           </div>
         </article>
-
-        {role === 'admin' ? (
-          <article className="panel admin-panel">
-            <SectionIntro
-              title="Admin review lane"
-              detail="Visible only in the admin mock view to satisfy the multi-role course requirement."
-            />
-            <WorkflowList items={adminQueue} compact />
-          </article>
-        ) : null}
       </section>
     </div>
   )

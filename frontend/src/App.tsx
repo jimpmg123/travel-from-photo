@@ -4,6 +4,7 @@ import './App.css'
 import { useAuth } from './app/context/AuthContext'
 import { GenerationToast } from './app/components/GenerationToast'
 import { TopBar } from './app/components/TopBar'
+import { AdminPanelPage } from './app/pages/AdminPanelPage'
 import { ChatPage } from './app/pages/ChatPage'
 import { CollectionDetailPage } from './app/pages/CollectionDetailPage'
 import { GalleryPage } from './app/pages/GalleryPage'
@@ -23,7 +24,7 @@ import type { SearchRun, SearchUploadItem } from './app/search/types'
 function App() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isLoggedIn, user, role, logout } = useAuth()
+  const { isLoggedIn, role, logout } = useAuth()
   const [latestSearchSession, setLatestSearchSession] = useState<SearchRun | null>(null)
   const [searchInFlight, setSearchInFlight] = useState(false)
   const [readyToast, setReadyToast] = useState<string | null>(null)
@@ -162,12 +163,13 @@ function App() {
             <Route path="/journal/collections/:journalId" element={<JournalDetailPage />} />
             <Route path="/gallery" element={<GalleryPage />} />
             <Route path="/gallery/collection/:collectionName" element={<CollectionDetailPage />} />
-            <Route
-              path="/profile"
-              element={<ProfilePage user={user} isLoggedIn={isLoggedIn} role={role} />}
-            />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route
+              path="/admin"
+              element={role === 'admin' ? <AdminPanelPage /> : <Navigate to="/" replace />}
+            />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

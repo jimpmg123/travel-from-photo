@@ -81,3 +81,24 @@ npm run dev
 - [API Overview](docs/api-overview.md)
 - [API Details](docs/api-details.md)
 - [Errors and Fallbacks](docs/errors-and-fallbacks.md)
+
+## Complete Deployment Notes
+
+This merged version includes A track and B track features together.
+
+Deployment entry point:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+The backend applies Alembic migrations on startup. The B track social tables are managed by `backend/alembic/versions/e7b1c2d3a4f5_add_social_b_track.py`.
+
+For local test accounts:
+
+```bash
+docker compose exec backend python -m app.scripts.seed_complete
+```
+
+See `docs/COMPLETE_DEPLOYMENT_GUIDE.md` for details.
