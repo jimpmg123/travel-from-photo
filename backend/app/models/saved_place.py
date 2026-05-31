@@ -27,6 +27,7 @@ class SavedPlace(Base):
     latitude: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
     longitude: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
 
+    privacy: Mapped[str] = mapped_column(String(20), nullable=False, server_default="private")
     image_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 

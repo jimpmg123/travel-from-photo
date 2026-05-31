@@ -96,6 +96,7 @@ export type JournalSummary = {
   entry_count: number
   earliest_captured_at: string | null
   created_at: string
+  cover_image_url: string | null
 }
 
 export type JournalStats = {

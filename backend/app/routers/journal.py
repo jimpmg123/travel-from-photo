@@ -135,8 +135,9 @@ def list_journals(
             entry_count=entry_count,
             earliest_captured_at=earliest,
             created_at=journal.created_at,
+            cover_image_url=cover_url,
         )
-        for journal, entry_count, earliest, city, country in rows
+        for journal, entry_count, earliest, city, country, cover_url in rows
     ]
 
 

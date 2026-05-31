@@ -11,6 +11,7 @@ from app.core.db import get_db
 from app.core.deps import get_current_user
 from app.models.image_metadata import ImageMetadata
 from app.models.saved_place import SavedPlace
+from app.models.social import UserSetting
 from app.models.user import User
 from app.services.shared.exif_service import extract_image_metadata
 
@@ -32,6 +33,7 @@ class SavedPlaceOut(BaseModel):
     image_url: str | None
     image_metadata_id: int | None
     has_gps: bool
+    privacy: str = "private"
     created_at: datetime
 
     class Config:
@@ -84,6 +86,7 @@ def _serialize(place: SavedPlace) -> SavedPlaceOut:
         image_url=place.image_url,
         image_metadata_id=place.image_metadata_id,
         has_gps=lat is not None and lng is not None,
+        privacy=getattr(place, "privacy", "private"),
         created_at=place.created_at,
     )
 
@@ -188,6 +191,9 @@ async def create_saved_place(
         fallback_lng=longitude,
     )
 
+    user_setting = db.query(UserSetting).filter(UserSetting.user_id == current_user.id).first()
+    default_privacy = user_setting.default_privacy if user_setting else "private"
+
     row = SavedPlace(
         user_id=current_user.id,
         collection_name=(collection_name or "My Gallery").strip() or "My Gallery",
@@ -200,6 +206,7 @@ async def create_saved_place(
         image_filename=image.filename,
         image_url=f"/uploads/gallery/{saved_name}",
         image_metadata_id=image_metadata_id,
+        privacy=default_privacy,
     )
     db.add(row)
     db.commit()

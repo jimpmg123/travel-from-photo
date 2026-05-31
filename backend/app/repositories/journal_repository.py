@@ -10,6 +10,7 @@ from app.models.journal import (
     Journal,
     JournalEntry,
 )
+from app.models.saved_place import SavedPlace
 
 
 def find_active_job_for_user(db: Session, user_id: int) -> Journal | None:
@@ -69,7 +70,7 @@ def count_journal_entries(db: Session, journal_id: int) -> int:
     return int(db.execute(stmt).scalar_one() or 0)
 
 
-def list_user_journals(db: Session, user_id: int) -> list[tuple[Journal, int, datetime | None, str | None, str | None]]:
+def list_user_journals(db: Session, user_id: int) -> list[tuple[Journal, int, datetime | None, str | None, str | None, str | None]]:
     """Return rows of (journal, entry_count, earliest_captured_at, primary_city,
     primary_country) for the collections page. We bundle the aggregates into
     one query so the collections grid stays cheap as the list grows."""
@@ -83,16 +84,26 @@ def list_user_journals(db: Session, user_id: int) -> list[tuple[Journal, int, da
         .subquery()
     )
 
-    # Pick the city/country from the entry with the lowest entry_order (the
-    # first chronological photo). DISTINCT ON would be cleanest but ORDER BY
-    # within a window keeps the query portable.
+    # First entry subquery: city/country + image_id for cover photo
     first_entry_subq = (
         select(
             JournalEntry.journal_id.label("jid"),
             JournalEntry.city.label("city"),
             JournalEntry.country.label("country"),
+            JournalEntry.image_id.label("image_id"),
             JournalEntry.entry_order.label("entry_order"),
         )
+        .subquery()
+    )
+
+    # Cover image: look up saved_place.image_url via image_metadata_id
+    cover_subq = (
+        select(
+            SavedPlace.image_metadata_id.label("img_id"),
+            SavedPlace.image_url.label("cover_url"),
+        )
+        .where(SavedPlace.user_id == user_id)
+        .where(SavedPlace.image_url.isnot(None))
         .subquery()
     )
 
@@ -103,19 +114,21 @@ def list_user_journals(db: Session, user_id: int) -> list[tuple[Journal, int, da
             entry_count_subq.c.earliest,
             first_entry_subq.c.city,
             first_entry_subq.c.country,
+            cover_subq.c.cover_url,
         )
         .outerjoin(entry_count_subq, entry_count_subq.c.jid == Journal.id)
         .outerjoin(
             first_entry_subq,
             (first_entry_subq.c.jid == Journal.id) & (first_entry_subq.c.entry_order == 0),
         )
+        .outerjoin(cover_subq, cover_subq.c.img_id == first_entry_subq.c.image_id)
         .where(Journal.user_id == user_id)
         .order_by(Journal.created_at.desc())
     )
 
-    rows: list[tuple[Journal, int, datetime | None, str | None, str | None]] = []
-    for journal, entry_count, earliest, city, country in db.execute(stmt).all():
-        rows.append((journal, int(entry_count or 0), earliest, city, country))
+    rows: list[tuple[Journal, int, datetime | None, str | None, str | None, str | None]] = []
+    for journal, entry_count, earliest, city, country, cover_url in db.execute(stmt).all():
+        rows.append((journal, int(entry_count or 0), earliest, city, country, cover_url))
     return rows
 
 

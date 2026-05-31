@@ -77,6 +77,7 @@ class JournalSummary(BaseModel):
     entry_count: int
     earliest_captured_at: datetime | None = None
     created_at: datetime
+    cover_image_url: str | None = None
 
 
 class JournalDetailResponse(BaseModel):

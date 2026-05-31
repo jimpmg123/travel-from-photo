@@ -119,8 +119,8 @@ export function SettingsPage() {
         </article>
 
         <article className="panel content-panel">
-          <div className="section-mini"><Lock /><h3>Security preferences</h3></div>
-          <p className="muted-copy">JWT authentication protects profile, settings, chat, and admin API requests.</p>
+          <div className="section-mini"><Lock /><h3>Security info</h3></div>
+          <p className="muted-copy">Read-only. Shows how your account and data are protected on the backend.</p>
           <div className="result-grid">
             <div className="result-card"><span className="result-label">API key safety</span><strong>Backend only</strong><p>OpenAI and map keys are read from environment variables.</p></div>
             <div className="result-card"><span className="result-label">Private data</span><strong>Owner scoped</strong><p>Private content is tied to authenticated users.</p></div>

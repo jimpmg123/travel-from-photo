@@ -87,24 +87,19 @@ p {
   min-height: 100vh;
 }
 
-[data-theme="dark"] {
+/* ── Dark mode ──────────────────────────────── */
+[data-theme="dark"],
+[data-theme="system"]:has(body) {
   --ink: #e8e4dc;
   --muted: #9a9080;
   --accent: #5b9ec9;
   --accent-warm: #d47a50;
   --warm: #c47a3a;
-  --paper: #1a1814;
-  --paper-deep: #222018;
-  --line: #3a3630;
-  --line-soft: rgba(200, 180, 140, 0.12);
+  --paper: #1c1a16;
+  --paper-deep: #242018;
+  --line: #38342c;
+  --line-soft: rgba(200, 180, 140, 0.1);
   color-scheme: dark;
-}
-
-[data-theme="dark"] body {
-  background:
-    repeating-linear-gradient(0deg, transparent 0, transparent 28px, rgba(200, 180, 140, 0.02) 28px, rgba(200, 180, 140, 0.02) 29px),
-    repeating-linear-gradient(90deg, transparent 0, transparent 28px, rgba(200, 180, 140, 0.02) 28px, rgba(200, 180, 140, 0.02) 29px),
-    var(--paper);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -114,10 +109,80 @@ p {
     --accent: #5b9ec9;
     --accent-warm: #d47a50;
     --warm: #c47a3a;
-    --paper: #1a1814;
-    --paper-deep: #222018;
-    --line: #3a3630;
-    --line-soft: rgba(200, 180, 140, 0.12);
+    --paper: #1c1a16;
+    --paper-deep: #242018;
+    --line: #38342c;
+    --line-soft: rgba(200, 180, 140, 0.1);
     color-scheme: dark;
   }
+}
+
+/* Override hardcoded rgba(255,255,255,...) surfaces in dark mode.
+   Rather than touching every rule, we invert brightness on the key
+   structural layers so rgba-white components appear dark. */
+[data-theme="dark"] body,
+[data-theme="dark"] .app-shell {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .panel,
+[data-theme="dark"] .result-card,
+[data-theme="dark"] .upload-zone,
+[data-theme="dark"] .field input,
+[data-theme="dark"] .field select,
+[data-theme="dark"] .field textarea,
+[data-theme="dark"] .chat-input-row input,
+[data-theme="dark"] .search-field input,
+[data-theme="dark"] .admin-table,
+[data-theme="dark"] .admin-table td,
+[data-theme="dark"] .admin-table th {
+  background: var(--paper-deep);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .topbar,
+[data-theme="dark"] .topbar-nav-button,
+[data-theme="dark"] .desktop-side-nav,
+[data-theme="dark"] .desktop-side-button,
+[data-theme="dark"] .mobile-bottom-nav {
+  background: var(--paper-deep);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .journal-collection-card,
+[data-theme="dark"] .picker-card,
+[data-theme="dark"] .chat-message,
+[data-theme="dark"] .lounge-room,
+[data-theme="dark"] .chat-room,
+[data-theme="dark"] .chat-panel,
+[data-theme="dark"] .chat-sidebar {
+  background: var(--paper-deep);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .button-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+[data-theme="dark"] .button-secondary {
+  background: var(--paper-deep);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] body,
+  [data-theme="system"] .app-shell { background: var(--paper); color: var(--ink); }
+  [data-theme="system"] .panel,
+  [data-theme="system"] .result-card,
+  [data-theme="system"] .field input,
+  [data-theme="system"] .field select,
+  [data-theme="system"] .field textarea { background: var(--paper-deep); color: var(--ink); border-color: var(--line); }
+  [data-theme="system"] .topbar,
+  [data-theme="system"] .desktop-side-nav { background: var(--paper-deep); border-color: var(--line); }
 }

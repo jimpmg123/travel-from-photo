@@ -12,6 +12,7 @@ import {
   type RecommendationItem,
 } from '../services/journalApi'
 import { humanizeTag } from '../utils/tags'
+import { absoluteImageUrl } from '../services/galleryApi'
 
 type ViewTab = 'collections' | 'stats' | 'pie' | 'gpt'
 type PieAxis = 'subject' | 'atmosphere' | 'activity'
@@ -352,7 +353,16 @@ export function JournalCollectionsPage() {
                       className="journal-collection-card"
                       onClick={() => navigate(`/journal/collections/${j.id}`)}
                     >
-                      <div className="journal-collection-card-strip" />
+                      {j.cover_image_url ? (
+                        <img
+                          className="journal-collection-card-cover"
+                          src={absoluteImageUrl(j.cover_image_url) ?? undefined}
+                          alt={j.title ?? 'Journal cover'}
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="journal-collection-card-strip" />
+                      )}
                       <div className="journal-collection-card-body">
                         <strong>{j.title?.trim() || 'Untitled Journal'}</strong>
                         <span className="journal-collection-card-place">
