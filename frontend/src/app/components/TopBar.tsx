@@ -140,6 +140,25 @@ export function TopBar({ onLogout }: TopBarProps) {
         </div>
       </header>
 
+      <nav className="desktop-side-nav" aria-label="Primary desktop">
+        {visibleNavItems.map((item) => {
+          const Icon = navIcons[item.id]
+          return (
+            <button
+              key={item.id}
+              type="button"
+              className={`desktop-side-button ${activeNavId === item.id ? 'is-active' : ''}`}
+              onClick={() => navigate(navPath[item.id] ?? '/')}
+              aria-label={item.label}
+              title={item.label}
+            >
+              {Icon ? <Icon className="desktop-side-icon" /> : null}
+              <span>{item.label}</span>
+            </button>
+          )
+        })}
+      </nav>
+
       {isMobileNavOpen && (
         <div className="mobile-nav-backdrop" onClick={() => setIsMobileNavOpen(false)} />
       )}

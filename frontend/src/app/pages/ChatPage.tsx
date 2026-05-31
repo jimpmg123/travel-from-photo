@@ -1,37 +1,142 @@
-import { useEffect, useState } from 'react'
-import { MessageCircle, Send } from 'lucide-react'
-import { getChatMessages, sendChatMessage, type ChatMessage } from '../services/socialApi'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Hash, Image, Send, Users } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import {
+  getChatMessages,
+  getChatRooms,
+  sendChatMessage,
+  type ChatMessage,
+  type ChatRoom,
+} from '../services/socialApi'
+
+const API_BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
+  (import.meta.env.VITE_API_URL as string | undefined) ??
+  'http://127.0.0.1:8000/api'
+
+const TOKEN_KEY = 'tfp_token'
+
+function toWsUrl(roomId: number): string {
+  const token = localStorage.getItem(TOKEN_KEY) ?? ''
+  const base = API_BASE_URL.startsWith('http')
+    ? API_BASE_URL
+    : `${window.location.origin}${API_BASE_URL.startsWith('/') ? API_BASE_URL : `/${API_BASE_URL}`}`
+  const apiUrl = new URL(base)
+  apiUrl.protocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:'
+  apiUrl.pathname = `${apiUrl.pathname.replace(/\/$/, '')}/ws/chat/${roomId}`
+  apiUrl.search = `token=${encodeURIComponent(token)}`
+  return apiUrl.toString()
+}
+
+function roomMatchesTags(room: ChatRoom, tags: string[]): boolean {
+  if (!tags.length) return false
+  return tags.includes(room.tagKey)
+}
 
 export function ChatPage() {
+  const [searchParams] = useSearchParams()
+  const recommendedTags = useMemo(
+    () => (searchParams.get('tags') ?? '').split(',').map((tag) => tag.trim().toLowerCase()).filter(Boolean),
+    [searchParams],
+  )
+  const [rooms, setRooms] = useState<ChatRoom[]>([])
+  const [activeRoomId, setActiveRoomId] = useState<number | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [draft, setDraft] = useState('')
-  const [statusMessage, setStatusMessage] = useState('Loading messages...')
+  const [statusMessage, setStatusMessage] = useState('Loading tag lounges...')
   const [isSending, setIsSending] = useState(false)
+  const [socketState, setSocketState] = useState<'connecting' | 'online' | 'polling'>('connecting')
+  const socketRef = useRef<WebSocket | null>(null)
 
-  const loadMessages = () => {
-    getChatMessages()
-      .then((items) => {
-        setMessages(items)
-        setStatusMessage('Live chat is connected to the backend database.')
-      })
-      .catch((error: Error) => setStatusMessage(error.message))
-  }
+  const activeRoom = rooms.find((room) => room.id === activeRoomId) ?? null
 
   useEffect(() => {
+    getChatRooms()
+      .then((items) => {
+        setRooms(items)
+        const recommended = items.find((room) => roomMatchesTags(room, recommendedTags))
+        setActiveRoomId((current) => current ?? recommended?.id ?? items[0]?.id ?? null)
+        setStatusMessage('13 permanent tag lounges are loaded from the backend database.')
+      })
+      .catch((error: Error) => setStatusMessage(error.message))
+  }, [recommendedTags])
+
+  useEffect(() => {
+    if (!activeRoomId) return
+    let cancelled = false
+
+    const loadMessages = () => {
+      getChatMessages(activeRoomId, 50)
+        .then((items) => {
+          if (cancelled) return
+          setMessages(items)
+          setStatusMessage('Past messages are loaded from PostgreSQL. Empty lounges are still permanent.')
+        })
+        .catch((error: Error) => {
+          if (!cancelled) setStatusMessage(error.message)
+        })
+    }
+
     loadMessages()
-    const timer = window.setInterval(loadMessages, 10000)
-    return () => window.clearInterval(timer)
-  }, [])
+    const timer = window.setInterval(loadMessages, 15000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [activeRoomId])
+
+  useEffect(() => {
+    if (!activeRoomId) return
+    socketRef.current?.close()
+    const socket = new WebSocket(toWsUrl(activeRoomId))
+    socketRef.current = socket
+    setSocketState('connecting')
+
+    socket.onopen = () => setSocketState('online')
+    socket.onerror = () => setSocketState('polling')
+    socket.onclose = () => setSocketState('polling')
+    socket.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data) as
+          | { type: 'message'; message: ChatMessage }
+          | { type: 'presence'; onlineCount: number }
+          | { type: 'error'; detail: string }
+        if (payload.type === 'message') {
+          setMessages((items) => {
+            if (items.some((item) => item.id === payload.message.id)) return items
+            return [...items, payload.message]
+          })
+        } else if (payload.type === 'presence') {
+          setRooms((items) => items.map((room) => room.id === activeRoomId ? { ...room, onlineCount: payload.onlineCount } : room))
+        } else if (payload.type === 'error') {
+          setStatusMessage(payload.detail)
+        }
+      } catch {
+        // Ignore malformed websocket payloads.
+      }
+    }
+
+    return () => {
+      socket.close()
+    }
+  }, [activeRoomId])
 
   const handleSend = async () => {
     const text = draft.trim()
-    if (!text) return
+    if (!text || !activeRoomId) return
     setIsSending(true)
     try {
-      const saved = await sendChatMessage({ messageText: text })
-      setMessages((items) => [...items, saved])
-      setDraft('')
-      setStatusMessage('Message sent.')
+      const socket = socketRef.current
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ messageText: text }))
+        setDraft('')
+        setStatusMessage('Message sent through WebSocket.')
+      } else {
+        const saved = await sendChatMessage(activeRoomId, { messageText: text })
+        setMessages((items) => [...items, saved])
+        setDraft('')
+        setStatusMessage('Message sent through REST fallback.')
+      }
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : 'Failed to send message.')
     } finally {
@@ -39,35 +144,92 @@ export function ChatPage() {
     }
   }
 
+  const groupedRooms = useMemo(() => {
+    const groups: Record<string, ChatRoom[]> = { nature: [], urban: [], culture: [], experience: [] }
+    rooms.forEach((room) => {
+      const key = room.category in groups ? room.category : 'experience'
+      groups[key].push(room)
+    })
+    return groups
+  }, [rooms])
+
   return (
     <div className="stack-xl">
       <section className="section-heading">
         <div>
           <p className="eyebrow">Live Chat</p>
-          <h2>Chat with support</h2>
+          <h2>Tag-based travel lounges</h2>
         </div>
-        <p className="section-copy">Messages are saved in PostgreSQL and protected by login.</p>
+        <p className="section-copy">
+          Search tags recommend one of 13 permanent lounges. Messages stay saved even when nobody is online.
+        </p>
       </section>
 
       <section className="chat-layout panel">
-        <aside className="chat-sidebar">
-          <h3>Conversations</h3>
-          <button className="chat-room is-active" type="button"><MessageCircle size={18} /> Support Room</button>
-          <p className="muted-copy">Authenticated users can send support messages here.</p>
+        <aside className="chat-sidebar chat-sidebar--lounges">
+          <div className="chat-sidebar-head">
+            <h3>13 Lounges</h3>
+            <span className="pill"><Users size={14} /> {rooms.reduce((sum, room) => sum + room.onlineCount, 0)} online</span>
+          </div>
+          {recommendedTags.length ? (
+            <div className="lounge-recommendation-note">
+              <Hash size={14} /> Recommended from Search tags: {recommendedTags.map((tag) => `#${tag}`).join(' ')}
+            </div>
+          ) : null}
+
+          {Object.entries(groupedRooms).map(([category, items]) => items.length ? (
+            <div className="lounge-group" key={category}>
+              <p className="lounge-group-title">{category}</p>
+              {items.map((room) => (
+                <button
+                  key={room.id}
+                  className={`chat-room lounge-room${room.id === activeRoomId ? ' is-active' : ''}${roomMatchesTags(room, recommendedTags) ? ' is-recommended' : ''}`}
+                  type="button"
+                  onClick={() => setActiveRoomId(room.id)}
+                >
+                  <span className="lounge-emoji">{room.emoji}</span>
+                  <span>
+                    <strong>{room.displayName}</strong>
+                    <small>{room.onlineCount} online · {room.messageCount} messages</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null)}
         </aside>
+
         <article className="chat-panel">
-          <div className="chat-header"><strong>Support Room</strong><span className="pill">Online</span></div>
+          <div className="chat-header">
+            <div>
+              <strong>{activeRoom ? `${activeRoom.emoji} ${activeRoom.displayName}` : 'Select a lounge'}</strong>
+              {activeRoom ? <p className="field-note">{activeRoom.description}</p> : null}
+            </div>
+            <span className={`pill ${socketState === 'online' ? 'pill-success' : ''}`}>
+              {socketState === 'online' ? 'WebSocket online' : socketState === 'connecting' ? 'Connecting...' : 'REST polling fallback'}
+            </span>
+          </div>
+
           <div className="chat-messages">
             {messages.length ? messages.map((message) => (
               <div key={message.id} className="chat-message">
                 <div><strong>{message.senderName}</strong><span>{new Date(message.createdAt).toLocaleString()}</span></div>
                 <p>{message.messageText}</p>
+                {message.imageId ? <span className="message-attachment"><Image size={13} /> image #{message.imageId}</span> : null}
               </div>
-            )) : <p className="muted-copy">No messages yet.</p>}
+            )) : <p className="muted-copy">No messages in this lounge yet. The room still exists and will keep future messages.</p>}
           </div>
+
           <div className="chat-input-row">
-            <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Type your message..." onKeyDown={(e) => { if (e.key === 'Enter') void handleSend() }} />
-            <button className="button-primary" type="button" onClick={handleSend} disabled={isSending}><Send size={16} /> Send</button>
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={activeRoom ? `Message ${activeRoom.displayName}...` : 'Select a lounge first...'}
+              onKeyDown={(e) => { if (e.key === 'Enter') void handleSend() }}
+              disabled={!activeRoom}
+            />
+            <button className="button-primary" type="button" onClick={handleSend} disabled={isSending || !activeRoom}>
+              <Send size={16} /> Send
+            </button>
           </div>
           <p className="field-note">{statusMessage}</p>
         </article>

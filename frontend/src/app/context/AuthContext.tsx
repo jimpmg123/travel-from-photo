@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
-import { apiLogin } from '../services/authApi'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { apiGetCurrentUser, apiLogin } from '../services/authApi'
 import type { AuthUser, Role } from '../types'
 
 const TOKEN_KEY = 'tfp_token'
@@ -46,6 +46,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(data.access_token)
     setUser(authUser)
   }
+
+
+  useEffect(() => {
+    if (!token) return
+    let cancelled = false
+    apiGetCurrentUser(token)
+      .then((data) => {
+        if (cancelled) return
+        const authUser: AuthUser = {
+          userId: data.user_id,
+          firstName: data.first_name,
+          lastName: data.last_name,
+          email: data.email,
+          role: data.role as Role,
+        }
+        localStorage.setItem(USER_KEY, JSON.stringify(authUser))
+        setUser(authUser)
+      })
+      .catch(() => {
+        if (cancelled) return
+        localStorage.removeItem(TOKEN_KEY)
+        localStorage.removeItem(USER_KEY)
+        setToken(null)
+        setUser(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [token])
 
   const logout = () => {
     localStorage.removeItem(TOKEN_KEY)

@@ -8,6 +8,8 @@ from app.auth.router import router as auth_router
 from app.routers.admin import router as admin_router
 from app.routers.chat import router as chat_router
 from app.routers.gallery import router as gallery_router
+from app.routers.admin import router as admin_router
+from app.routers.chat import router as chat_router
 from app.routers.geocode import router as geocode_router
 from app.routers.image import router as image_router
 from app.routers.journal import router as journal_router

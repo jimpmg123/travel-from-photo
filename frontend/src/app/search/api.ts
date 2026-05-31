@@ -1,6 +1,11 @@
 import type { Candidate, SearchApiImageResponse, SearchUploadAnalysis, SearchUploadItem } from './types'
 
-const SEARCH_API_URL = 'http://localhost:8000/api/image'
+const API_BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
+  (import.meta.env.VITE_API_URL as string | undefined) ??
+  'http://localhost:8000/api'
+
+const SEARCH_API_URL = `${API_BASE_URL.replace(/\/$/, '')}/image`
 
 async function analyzeSingleUpload(
   upload: SearchUploadItem,

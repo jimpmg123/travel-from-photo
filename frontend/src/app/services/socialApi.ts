@@ -46,11 +46,25 @@ export type ProfilePayload = {
   theme: string
 }
 
+export type ChatRoom = {
+  id: number
+  tagKey: string
+  displayName: string
+  emoji: string
+  description: string
+  category: string
+  onlineCount: number
+  messageCount: number
+}
+
 export type ChatMessage = {
   id: string
+  roomId: number
+  roomTag: string
   senderId: string
   senderName: string
   messageText: string
+  imageId?: number | null
   createdAt: string
   readAt?: string | null
 }
@@ -107,13 +121,27 @@ export async function updateSettings(payload: SettingsPayload): Promise<Settings
   })
 }
 
-export async function getChatMessages(): Promise<ChatMessage[]> {
-  const response = await requestJson<{ items: ChatMessage[] }>('/chat/messages')
+export async function getChatRooms(): Promise<ChatRoom[]> {
+  const response = await requestJson<{ items: ChatRoom[] }>('/chat-rooms')
   return response.items
 }
 
-export async function sendChatMessage(payload: { messageText: string }): Promise<ChatMessage> {
-  return requestJson<ChatMessage>('/chat/messages', {
+export async function getRecommendedChatRooms(tags: string[] = [], imageId?: number): Promise<ChatRoom[]> {
+  const params = new URLSearchParams()
+  if (tags.length) params.set('tags', tags.join(','))
+  if (imageId != null) params.set('imageId', String(imageId))
+  const suffix = params.toString() ? `?${params.toString()}` : ''
+  const response = await requestJson<{ items: ChatRoom[] }>(`/chat-rooms/recommendations${suffix}`)
+  return response.items
+}
+
+export async function getChatMessages(roomId: number, limit = 50): Promise<ChatMessage[]> {
+  const response = await requestJson<{ items: ChatMessage[] }>(`/chat-rooms/${roomId}/messages?limit=${limit}`)
+  return response.items
+}
+
+export async function sendChatMessage(roomId: number, payload: { messageText: string; imageId?: number | null }): Promise<ChatMessage> {
+  return requestJson<ChatMessage>(`/chat-rooms/${roomId}/messages`, {
     method: 'POST',
     body: JSON.stringify(payload),
   })

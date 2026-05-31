@@ -68,6 +68,8 @@ function toSearchImageResult(
       ocrTextUsed: false,
       candidates: [],
       verdict: 'failed',
+      standardTags: [],
+      chatLounges: [],
     }
   }
 
@@ -89,6 +91,8 @@ function toSearchImageResult(
       ocrTextUsed: false,
       candidates: [],
       verdict: 'failed',
+      standardTags: [],
+      chatLounges: [],
     }
   }
 
@@ -131,6 +135,8 @@ function toSearchImageResult(
   // "Top Match + Other Matches" per uploaded image.
   const candidates = analysis.response.candidates ?? []
   const verdict = analysis.response.verdict ?? null
+  const standardTags = analysis.response.tags ?? []
+  const chatLounges = analysis.response.chat_lounges ?? []
 
   if (hasCoordinates) {
     const isApproximateOpenAi =
@@ -161,6 +167,8 @@ function toSearchImageResult(
       ocrTextUsed,
       candidates,
       verdict,
+      standardTags,
+      chatLounges,
     }
   }
 
@@ -188,6 +196,8 @@ function toSearchImageResult(
     ocrTextUsed,
     candidates,
     verdict,
+    standardTags,
+    chatLounges,
   }
 }
 

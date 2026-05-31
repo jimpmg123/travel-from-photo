@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.core.db import SessionLocal
 from app.core.security import hash_password
-from app.models.social import ChatMessage, ModerationItem, UserSetting
+from app.models.social import ChatMessage, ChatRoom, ModerationItem, UserSetting
 from app.models.user import User
+from app.services.chat_tags import LOUNGE_TAGS
 
 
 DEFAULT_PASSWORD = "Travel2026!"
@@ -59,14 +60,37 @@ def get_or_create_settings(db: Session, user: User, bio: str) -> None:
         )
 
 
-def seed_chat(db: Session, sender: User, text: str) -> None:
+def seed_chat_rooms(db: Session) -> dict[str, ChatRoom]:
+    rooms: dict[str, ChatRoom] = {room.tag_key: room for room in db.query(ChatRoom).all()}
+    for tag in LOUNGE_TAGS:
+        room = rooms.get(tag.tag_key)
+        if room is None:
+            room = ChatRoom(
+                tag_key=tag.tag_key,
+                display_name=tag.display_name,
+                emoji=tag.emoji,
+                description=tag.description,
+                category=tag.category,
+            )
+            db.add(room)
+            db.flush()
+            rooms[tag.tag_key] = room
+        else:
+            room.display_name = tag.display_name
+            room.emoji = tag.emoji
+            room.description = tag.description
+            room.category = tag.category
+    return rooms
+
+
+def seed_chat(db: Session, sender: User, room: ChatRoom, text: str) -> None:
     exists = (
         db.query(ChatMessage)
-        .filter(ChatMessage.room_id == "support", ChatMessage.message_text == text)
+        .filter(ChatMessage.room_id == room.id, ChatMessage.message_text == text)
         .one_or_none()
     )
     if exists is None:
-        db.add(ChatMessage(sender_user_id=sender.id, room_id="support", message_text=text))
+        db.add(ChatMessage(sender_user_id=sender.id, room_id=room.id, message_text=text))
 
 
 def seed_moderation(db: Session, *, item_type: str, title: str, reporter_name: str, reason: str) -> None:
@@ -105,8 +129,12 @@ def main() -> None:
         db.flush()
         get_or_create_settings(db, admin, "I like saving travel photos and checking places later.")
         get_or_create_settings(db, traveler, "I use Travel From Photo to organize trip memories.")
-        seed_chat(db, admin, "Welcome. Use this chat for account, gallery, journal, or search support.")
-        seed_chat(db, traveler, "I need help saving a manually entered location.")
+        rooms = seed_chat_rooms(db)
+        seed_chat(db, admin, rooms["urban"], "Welcome to Urban & Street. Share city clues, street photos, and location tips here.")
+        seed_chat(db, traveler, rooms["historical"], "My Eiffel Tower photo was tagged historical and urban. Does this room keep past messages?")
+        seed_chat(db, admin, rooms["historical"], "Yes. All lounge messages are saved in PostgreSQL, even when nobody is online.")
+        seed_chat(db, traveler, rooms["food"], "Food photos should enter the Food & Cafe lounge after Search returns the food tag.")
+        seed_chat(db, admin, rooms["sunset"], "Sunset & Sunrise is useful when the image has golden-hour lighting or sky clues.")
         seed_moderation(
             db,
             item_type="Search result",
@@ -125,6 +153,7 @@ def main() -> None:
         print("Seed complete.")
         print("Admin login: jaemin@example.com / Travel2026!")
         print("Traveler login: mina@example.com / Travel2026!")
+        print("Chat lounges seeded: 13 tag-based rooms")
     finally:
         db.close()
 

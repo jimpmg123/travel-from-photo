@@ -11,7 +11,17 @@ from openai import AsyncOpenAI
 from app.core.config import OPENAI_API_KEY, OPENAI_VISION_MODEL
 
 logger = logging.getLogger(__name__)
-client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+_client: AsyncOpenAI | None = None
+
+
+def _get_openai_client() -> AsyncOpenAI | None:
+    global _client
+    if not OPENAI_API_KEY:
+        logger.warning("OPENAI_API_KEY is not configured; GPT arbiter is disabled.")
+        return None
+    if _client is None:
+        _client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+    return _client
 
 
 def _encode_image(image_path: Path) -> str:
@@ -53,6 +63,10 @@ async def run_gpt_arbiter(
         )
 
         user_prompt = f"Scored Candidates Data:\n{json.dumps(candidates_summary)}"
+
+        client = _get_openai_client()
+        if client is None:
+            return scored_candidates
 
         response = await asyncio.wait_for(
             client.chat.completions.create(

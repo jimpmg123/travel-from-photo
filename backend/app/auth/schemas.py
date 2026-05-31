@@ -40,3 +40,11 @@ class TokenResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+class CurrentUserResponse(BaseModel):
+    user_id: str
+    role: str
+    first_name: str
+    last_name: str
+    email: EmailStr
