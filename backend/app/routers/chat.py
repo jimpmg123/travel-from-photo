@@ -12,6 +12,7 @@ from app.core.db import SessionLocal, get_db
 from app.core.deps import get_current_user
 from app.core.security import decode_access_token
 from app.models.image_metadata import ImageMetadata
+from app.models.saved_place import SavedPlace
 from app.models.social import ChatMessage as ChatMessageModel
 from app.models.social import ChatRoom as ChatRoomModel
 from app.models.user import User
@@ -43,6 +44,7 @@ class ChatMessage(BaseModel):
     senderName: str
     messageText: str
     imageId: int | None = None
+    imageUrl: str | None = None
     createdAt: datetime
     readAt: datetime | None = None
 
@@ -50,6 +52,7 @@ class ChatMessage(BaseModel):
 class ChatMessageCreate(BaseModel):
     messageText: str = Field(..., min_length=1, max_length=1000)
     imageId: int | None = None
+    imageUrl: str | None = Field(default=None, max_length=500)
 
 
 class ChatMessageList(BaseModel):
@@ -122,6 +125,7 @@ def _serialize_message(message: ChatMessageModel) -> dict[str, Any]:
         "senderName": _sender_name(message.sender),
         "messageText": message.message_text,
         "imageId": message.image_id,
+        "imageUrl": message.image_url,
         "createdAt": message.created_at,
         "readAt": message.read_at,
     }
@@ -179,6 +183,19 @@ def _image_belongs_to_user(db: Session, image_id: int | None, current_user: User
         raise HTTPException(status_code=404, detail="Attached image not found.")
     if image.user_id is not None and image.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You cannot attach this image.")
+
+
+def _gallery_image_belongs_to_user(db: Session, image_url: str | None, current_user: User) -> None:
+    """A chat attachment URL must come from one of the sender's own saved places."""
+    if not image_url:
+        return
+    owned = (
+        db.query(SavedPlace.id)
+        .filter(SavedPlace.user_id == current_user.id, SavedPlace.image_url == image_url)
+        .first()
+    )
+    if owned is None:
+        raise HTTPException(status_code=403, detail="You can only attach photos from your own gallery.")
 
 
 async def _authenticate_ws_user(token: str | None, db: Session) -> User | None:
@@ -275,12 +292,14 @@ def send_room_message(
     if not text:
         raise HTTPException(status_code=400, detail="Message cannot be empty.")
     _image_belongs_to_user(db, payload.imageId, current_user)
+    _gallery_image_belongs_to_user(db, payload.imageUrl, current_user)
 
     message = ChatMessageModel(
         room_id=room.id,
         sender_user_id=current_user.id,
         message_text=text,
         image_id=payload.imageId,
+        image_url=payload.imageUrl,
     )
     db.add(message)
     db.commit()
@@ -349,8 +368,11 @@ async def chat_websocket(websocket: WebSocket, room_id: int, token: str | None =
                 continue
             image_id = data.get("imageId")
             image_id_int = int(image_id) if image_id is not None else None
+            image_url = data.get("imageUrl")
+            image_url_str = str(image_url)[:500] if image_url else None
             try:
                 _image_belongs_to_user(db, image_id_int, current_user)
+                _gallery_image_belongs_to_user(db, image_url_str, current_user)
             except HTTPException:
                 await websocket.send_json({"type": "error", "detail": "Invalid image attachment."})
                 continue
@@ -359,6 +381,7 @@ async def chat_websocket(websocket: WebSocket, room_id: int, token: str | None =
                 sender_user_id=current_user.id,
                 message_text=text[:1000],
                 image_id=image_id_int,
+                image_url=image_url_str,
             )
             db.add(message)
             db.commit()

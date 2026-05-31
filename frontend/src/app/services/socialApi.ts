@@ -65,6 +65,7 @@ export type ChatMessage = {
   senderName: string
   messageText: string
   imageId?: number | null
+  imageUrl?: string | null
   createdAt: string
   readAt?: string | null
 }
@@ -140,8 +141,18 @@ export async function getChatMessages(roomId: number, limit = 50): Promise<ChatM
   return response.items
 }
 
-export async function sendChatMessage(roomId: number, payload: { messageText: string; imageId?: number | null }): Promise<ChatMessage> {
+export async function sendChatMessage(
+  roomId: number,
+  payload: { messageText: string; imageId?: number | null; imageUrl?: string | null },
+): Promise<ChatMessage> {
   return requestJson<ChatMessage>(`/chat-rooms/${roomId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function reportBug(payload: { title: string; description: string }): Promise<{ id: string; status: string; createdAt: string }> {
+  return requestJson<{ id: string; status: string; createdAt: string }>('/reports', {
     method: 'POST',
     body: JSON.stringify(payload),
   })

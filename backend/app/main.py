@@ -8,12 +8,11 @@ from app.auth.router import router as auth_router
 from app.routers.admin import router as admin_router
 from app.routers.chat import router as chat_router
 from app.routers.gallery import router as gallery_router
-from app.routers.admin import router as admin_router
-from app.routers.chat import router as chat_router
 from app.routers.geocode import router as geocode_router
 from app.routers.image import router as image_router
 from app.routers.journal import router as journal_router
 from app.routers.profile import router as profile_router
+from app.routers.reports import router as reports_router
 
 APP_TITLE = "Travel From Photo API"
 API_PREFIX = "/api"
@@ -56,6 +55,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(geocode_router, prefix=API_PREFIX)
     app.include_router(chat_router, prefix=API_PREFIX)
     app.include_router(admin_router, prefix=API_PREFIX)
+    app.include_router(reports_router, prefix=API_PREFIX)
 
 
 def create_app() -> FastAPI:

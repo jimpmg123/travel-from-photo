@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Bell, Lock, Palette } from 'lucide-react'
+import { Bell, Bug, Lock, Palette } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { getSettings, updateSettings, type SettingsPayload } from '../services/socialApi'
+import { getSettings, reportBug, updateSettings, type SettingsPayload } from '../services/socialApi'
 
 const fallbackSettings: SettingsPayload = {
   displayName: '',
@@ -18,6 +18,31 @@ export function SettingsPage() {
   })
   const [statusMessage, setStatusMessage] = useState('Loading settings...')
   const [isSaving, setIsSaving] = useState(false)
+
+  const [bugTitle, setBugTitle] = useState('')
+  const [bugDescription, setBugDescription] = useState('')
+  const [bugStatus, setBugStatus] = useState('')
+  const [isReporting, setIsReporting] = useState(false)
+
+  const handleReportBug = async () => {
+    const title = bugTitle.trim()
+    const description = bugDescription.trim()
+    if (title.length < 3 || description.length < 5) {
+      setBugStatus('Please add a short title and a description before sending.')
+      return
+    }
+    setIsReporting(true)
+    try {
+      await reportBug({ title, description })
+      setBugTitle('')
+      setBugDescription('')
+      setBugStatus('Thanks! Your bug report was sent to the admin team.')
+    } catch (error) {
+      setBugStatus(error instanceof Error ? error.message : 'Failed to send the bug report.')
+    } finally {
+      setIsReporting(false)
+    }
+  }
 
   useEffect(() => {
     let ignore = false
@@ -98,6 +123,36 @@ export function SettingsPage() {
           <div className="result-grid">
             <div className="result-card"><span className="result-label">API key safety</span><strong>Backend only</strong><p>OpenAI and map keys are read from environment variables.</p></div>
             <div className="result-card"><span className="result-label">Private data</span><strong>Owner scoped</strong><p>Private content is tied to authenticated users.</p></div>
+          </div>
+        </article>
+
+        <article className="panel content-panel">
+          <div className="section-mini"><Bug /><h3>Report a bug</h3></div>
+          <p className="muted-copy">Found something broken? Send it to the admin team. Reports appear in the moderation queue.</p>
+          <div className="form-stack">
+            <label className="field">
+              <span>Summary</span>
+              <input
+                value={bugTitle}
+                onChange={(e) => setBugTitle(e.target.value)}
+                placeholder="e.g. Search map does not load on mobile"
+                maxLength={200}
+              />
+            </label>
+            <label className="field">
+              <span>What happened?</span>
+              <textarea
+                value={bugDescription}
+                onChange={(e) => setBugDescription(e.target.value)}
+                placeholder="Describe the steps, what you expected, and what went wrong."
+                rows={4}
+                maxLength={2000}
+              />
+            </label>
+            <button type="button" className="button-primary" onClick={handleReportBug} disabled={isReporting}>
+              {isReporting ? 'Sending...' : 'Send bug report'}
+            </button>
+            {bugStatus ? <p className="field-note">{bugStatus}</p> : null}
           </div>
         </article>
       </section>

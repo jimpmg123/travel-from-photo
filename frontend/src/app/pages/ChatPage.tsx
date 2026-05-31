@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Hash, Image, Send, Users } from 'lucide-react'
+import { Hash, Image, Send, Users, X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import {
   getChatMessages,
@@ -8,6 +8,7 @@ import {
   type ChatMessage,
   type ChatRoom,
 } from '../services/socialApi'
+import { absoluteImageUrl, fetchCollections, type SavedPlace } from '../services/galleryApi'
 
 const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
@@ -47,8 +48,25 @@ export function ChatPage() {
   const [isSending, setIsSending] = useState(false)
   const [socketState, setSocketState] = useState<'connecting' | 'online' | 'polling'>('connecting')
   const socketRef = useRef<WebSocket | null>(null)
+  const [galleryImages, setGalleryImages] = useState<SavedPlace[]>([])
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [attachment, setAttachment] = useState<{ imageUrl: string } | null>(null)
 
   const activeRoom = rooms.find((room) => room.id === activeRoomId) ?? null
+
+  const openPicker = () => {
+    setPickerOpen(true)
+    if (galleryImages.length === 0) {
+      fetchCollections()
+        .then((collections) => {
+          const withPhotos = collections
+            .flatMap((collection) => collection.saves)
+            .filter((save) => Boolean(save.image_url))
+          setGalleryImages(withPhotos)
+        })
+        .catch((error: Error) => setStatusMessage(error.message))
+    }
+  }
 
   useEffect(() => {
     getChatRooms()
@@ -124,17 +142,20 @@ export function ChatPage() {
   const handleSend = async () => {
     const text = draft.trim()
     if (!text || !activeRoomId) return
+    const imageUrl = attachment?.imageUrl ?? null
     setIsSending(true)
     try {
       const socket = socketRef.current
       if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ messageText: text }))
+        socket.send(JSON.stringify({ messageText: text, imageUrl }))
         setDraft('')
+        setAttachment(null)
         setStatusMessage('Message sent through WebSocket.')
       } else {
-        const saved = await sendChatMessage(activeRoomId, { messageText: text })
+        const saved = await sendChatMessage(activeRoomId, { messageText: text, imageUrl })
         setMessages((items) => [...items, saved])
         setDraft('')
+        setAttachment(null)
         setStatusMessage('Message sent through REST fallback.')
       }
     } catch (error) {
@@ -214,12 +235,35 @@ export function ChatPage() {
               <div key={message.id} className="chat-message">
                 <div><strong>{message.senderName}</strong><span>{new Date(message.createdAt).toLocaleString()}</span></div>
                 <p>{message.messageText}</p>
-                {message.imageId ? <span className="message-attachment"><Image size={13} /> image #{message.imageId}</span> : null}
+                {message.imageUrl ? (
+                  <img className="chat-message-image" src={absoluteImageUrl(message.imageUrl) ?? undefined} alt="shared from gallery" loading="lazy" />
+                ) : message.imageId ? (
+                  <span className="message-attachment"><Image size={13} /> image #{message.imageId}</span>
+                ) : null}
               </div>
             )) : <p className="muted-copy">No messages in this lounge yet. The room still exists and will keep future messages.</p>}
           </div>
 
+          {attachment ? (
+            <div className="chat-attachment-preview">
+              <img src={absoluteImageUrl(attachment.imageUrl) ?? undefined} alt="attachment preview" />
+              <button type="button" onClick={() => setAttachment(null)} aria-label="Remove attachment">
+                <X size={14} /> Remove photo
+              </button>
+            </div>
+          ) : null}
+
           <div className="chat-input-row">
+            <button
+              type="button"
+              className="chat-attach-button"
+              onClick={openPicker}
+              disabled={!activeRoom}
+              aria-label="Attach a photo from your gallery"
+              title="Attach a photo from your gallery"
+            >
+              <Image size={18} />
+            </button>
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -234,6 +278,40 @@ export function ChatPage() {
           <p className="field-note">{statusMessage}</p>
         </article>
       </section>
+
+      {pickerOpen ? (
+        <div className="picker-backdrop" onClick={() => setPickerOpen(false)}>
+          <div className="picker-card" onClick={(e) => e.stopPropagation()}>
+            <div className="picker-head">
+              <h3>Attach a photo from your gallery</h3>
+              <button type="button" onClick={() => setPickerOpen(false)} aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+            {galleryImages.length ? (
+              <div className="picker-grid">
+                {galleryImages.map((save) => (
+                  <button
+                    key={save.id}
+                    type="button"
+                    className="picker-thumb"
+                    onClick={() => {
+                      if (save.image_url) setAttachment({ imageUrl: save.image_url })
+                      setPickerOpen(false)
+                    }}
+                    title={save.place_name}
+                  >
+                    <img src={absoluteImageUrl(save.image_url) ?? undefined} alt={save.place_name} loading="lazy" />
+                    <span>{save.place_name}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="muted-copy">No saved photos yet. Save a place in your gallery first.</p>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
