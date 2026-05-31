@@ -116,6 +116,14 @@ export async function deleteSavedPlace(id: number): Promise<void> {
   await handle<{ deleted_id: number }>(res)
 }
 
+export async function deleteCollection(name: string): Promise<{ deleted_count: number }> {
+  const res = await fetch(`${API_BASE}/gallery/collections/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+    headers: authHeader(),
+  })
+  return handle<{ deleted_count: number }>(res)
+}
+
 export async function renameCollection(oldName: string, newName: string): Promise<{ renamed_count: number; new_name: string }> {
   const res = await fetch(`${API_BASE}/gallery/collections/rename`, {
     method: 'POST',

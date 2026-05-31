@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, MapPin } from 'lucide-react'
+import { ArrowLeft, MapPin, Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { useSavedPlaces } from '../hooks/useSavedPlaces'
@@ -10,7 +10,7 @@ export function CollectionDetailPage() {
   const params = useParams<{ collectionName: string }>()
   const collectionName = decodeURIComponent(params.collectionName ?? '')
 
-  const { collections, loading, error, renameCollection, movePlace, deletePlace } = useSavedPlaces()
+  const { collections, loading, error, renameCollection, movePlace, deletePlace, deleteCollection } = useSavedPlaces()
 
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState(collectionName)
@@ -84,6 +84,23 @@ export function CollectionDetailPage() {
     }
   }
 
+  const handleDeleteCollection = async () => {
+    const count = collection.saves.length
+    const msg = count === 0
+      ? `Delete empty collection "${collection.name}"?`
+      : `Delete "${collection.name}" and all ${count} place${count === 1 ? '' : 's'} in it? This cannot be undone.`
+    if (!window.confirm(msg)) return
+    setBusy(true)
+    try {
+      await deleteCollection(collection.name)
+      navigate('/gallery', { replace: true })
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete collection')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const handleDelete = async (place: SavedPlace) => {
     if (!window.confirm(`Remove "${place.place_name}" from this collection?`)) return
     setBusy(true)
@@ -143,6 +160,17 @@ export function CollectionDetailPage() {
             <span>{collection.saves.length} places</span>
           </p>
         </div>
+
+        <button
+          type="button"
+          className="button-secondary collection-delete-btn"
+          onClick={() => void handleDeleteCollection()}
+          disabled={busy}
+          title="Delete this collection"
+        >
+          <Trash2 size={14} />
+          <span>Delete collection</span>
+        </button>
       </header>
 
       <section className="saved-places-grid">

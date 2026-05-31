@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import {
   type Collection,
+  deleteCollection,
   deleteSavedPlace,
   fetchCollections,
   renameCollection,
@@ -102,6 +103,16 @@ export function useSavedPlaces() {
     [reload],
   )
 
+  const deleteCollectionAction = useCallback(
+    async (name: string) => {
+      await deleteCollection(name)
+      const empties = loadEmptyCollections().filter((n) => n !== name)
+      saveEmptyCollections(empties)
+      await reload()
+    },
+    [reload],
+  )
+
   return {
     collections,
     loading,
@@ -111,5 +122,6 @@ export function useSavedPlaces() {
     movePlace,
     deletePlace,
     createEmptyCollection,
+    deleteCollection: deleteCollectionAction,
   }
 }

@@ -16,6 +16,60 @@ import { humanizeTag } from '../utils/tags'
 type ViewTab = 'collections' | 'stats' | 'pie' | 'gpt'
 type PieAxis = 'subject' | 'atmosphere' | 'activity'
 
+type LevelTier = {
+  level: number
+  title: string
+  min: number
+  max: number | null
+}
+
+const COUNTRY_LEVELS: LevelTier[] = [
+  { level: 1, title: 'Starting traveler', min: 1, max: 1 },
+  { level: 2, title: 'Broadening horizons', min: 2, max: 4 },
+  { level: 3, title: 'Pro passport holder', min: 5, max: 9 },
+  { level: 4, title: 'World is my stage', min: 10, max: 19 },
+  { level: 5, title: 'Borderless wanderer', min: 20, max: null },
+]
+
+const CITY_LEVELS: LevelTier[] = [
+  { level: 1, title: 'First footprints', min: 1, max: 3 },
+  { level: 2, title: 'Leaving the block', min: 4, max: 10 },
+  { level: 3, title: 'Wanderlust onset', min: 11, max: 25 },
+  { level: 4, title: 'No GPS needed', min: 26, max: 50 },
+  { level: 5, title: 'Global city collector', min: 51, max: null },
+]
+
+const PHOTO_LEVELS: LevelTier[] = [
+  { level: 1, title: 'Casual shutter', min: 1, max: 100 },
+  { level: 2, title: 'Memory keeper', min: 101, max: 500 },
+  { level: 3, title: 'Moment capturer', min: 501, max: 1500 },
+  { level: 4, title: 'Story archiver', min: 1501, max: 4000 },
+  { level: 5, title: 'Visual big data', min: 4001, max: null },
+]
+
+const DISTANCE_LEVELS: LevelTier[] = [
+  { level: 1, title: 'Nearby getaway', min: 1, max: 1000 },
+  { level: 2, title: 'Crossed a border', min: 1001, max: 5000 },
+  { level: 3, title: 'Continent crosser', min: 5001, max: 15000 },
+  { level: 4, title: 'Around the Earth', min: 15001, max: 40000 },
+  { level: 5, title: 'Mileage astronaut', min: 40001, max: null },
+]
+
+function resolveLevel(value: number, tiers: LevelTier[]): { tier: LevelTier; nextTier: LevelTier | null; progress: number } {
+  const safeValue = Math.max(0, value)
+  const tier =
+    tiers.find((t) => safeValue >= t.min && (t.max === null || safeValue <= t.max)) ?? tiers[0]
+  const nextTier = tiers.find((t) => t.level === tier.level + 1) ?? null
+  let progress = 0
+  if (tier.max !== null) {
+    const range = tier.max - tier.min + 1
+    progress = Math.min(1, Math.max(0, (safeValue - tier.min + 1) / range))
+  } else {
+    progress = 1
+  }
+  return { tier, nextTier, progress }
+}
+
 const formatDate = (iso: string | null): string => {
   if (!iso) return '—'
   const d = new Date(iso)
@@ -68,6 +122,103 @@ function PieChart({ data }: { data: { label: string; value: number }[] }) {
   )
 }
 
+function LevelBar({
+  icon,
+  metricLabel,
+  value,
+  unit,
+  tiers,
+}: {
+  icon: React.ReactNode
+  metricLabel: string
+  value: number
+  unit: string
+  tiers: LevelTier[]
+}) {
+  const { tier, nextTier, progress } = resolveLevel(value, tiers)
+  const formattedValue = value.toLocaleString()
+  const nextThreshold = nextTier ? nextTier.min.toLocaleString() : null
+
+  return (
+    <article className="level-bar">
+      <header className="level-bar-head">
+        <span className="level-bar-icon">{icon}</span>
+        <div className="level-bar-titles">
+          <p className="level-bar-metric">{metricLabel}</p>
+          <p className="level-bar-tier-title">{tier.title}</p>
+        </div>
+        <span className={`level-bar-badge level-bar-badge--${tier.level}`}>Lv {tier.level}</span>
+      </header>
+
+      <div className="level-bar-value-row">
+        <strong className="level-bar-value">{formattedValue}</strong>
+        <span className="level-bar-unit">{unit}</span>
+      </div>
+
+      <div className="level-bar-segments" role="presentation">
+        {tiers.map((t) => {
+          const reached = value >= t.min
+          return (
+            <span
+              key={t.level}
+              className={`level-bar-segment${reached ? ' is-reached' : ''}${t.level === tier.level ? ' is-current' : ''}`}
+              style={t.level === tier.level && t.max !== null ? { '--seg-fill': `${progress * 100}%` } as React.CSSProperties : undefined}
+            />
+          )
+        })}
+      </div>
+
+      <p className="level-bar-next">
+        {nextThreshold
+          ? `${(Math.max(0, nextTier!.min - value)).toLocaleString()} ${unit} to Lv ${nextTier!.level}`
+          : 'Max level reached'}
+      </p>
+    </article>
+  )
+}
+
+async function tryWikipediaThumb(title: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`)
+    if (!res.ok) return null
+    const body = await res.json()
+    return body?.originalimage?.source ?? body?.thumbnail?.source ?? null
+  } catch {
+    return null
+  }
+}
+
+async function tryWikipediaSearch(query: string): Promise<string | null> {
+  try {
+    const searchRes = await fetch(
+      `https://en.wikipedia.org/w/api.php?action=query&format=json&list=search&srlimit=1&origin=*&srsearch=${encodeURIComponent(query)}`,
+    )
+    if (!searchRes.ok) return null
+    const searchBody = await searchRes.json()
+    const firstTitle: string | undefined = searchBody?.query?.search?.[0]?.title
+    if (!firstTitle) return null
+    return tryWikipediaThumb(firstTitle)
+  } catch {
+    return null
+  }
+}
+
+async function findRepresentativePhoto(name: string, country: string): Promise<string | null> {
+  const attempts = [
+    name,
+    `${name} (${country})`,
+    `${name}, ${country}`,
+    `${name} city`,
+  ]
+  for (const a of attempts) {
+    const url = await tryWikipediaThumb(a)
+    if (url) return url
+  }
+  const searchUrl = await tryWikipediaSearch(`${name} ${country}`)
+  if (searchUrl) return searchUrl
+  return null
+}
+
 function useRecommendationPhotos(items: RecommendationItem[] | null): Record<string, string | null> {
   const [photos, setPhotos] = useState<Record<string, string | null>>({})
 
@@ -82,24 +233,8 @@ function useRecommendationPhotos(items: RecommendationItem[] | null): Record<str
       await Promise.all(
         missing.map(async (item) => {
           const k = key(item)
-          try {
-            const titleAttempts = [item.name, `${item.name} (${item.country})`, `${item.name}, ${item.country}`]
-            for (const title of titleAttempts) {
-              const res = await fetch(
-                `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`,
-              )
-              if (!res.ok) continue
-              const body = await res.json()
-              const url = body?.originalimage?.source ?? body?.thumbnail?.source ?? null
-              if (url) {
-                fetched[k] = url
-                return
-              }
-            }
-            fetched[k] = null
-          } catch {
-            fetched[k] = null
-          }
+          const url = await findRepresentativePhoto(item.name, item.country)
+          fetched[k] = url
         }),
       )
       if (!cancelled) {
@@ -237,28 +372,36 @@ export function JournalCollectionsPage() {
 
           {tab === 'stats' && stats !== null && (
             <div className="journal-stats-big">
-              <h3 className="journal-section-heading">Your travel at a glance</h3>
-              <div className="journal-stats-big-grid">
-                <div className="journal-stat-tile">
-                  <Globe size={28} />
-                  <strong>{stats.country_count}</strong>
-                  <span>countries</span>
-                </div>
-                <div className="journal-stat-tile">
-                  <MapPin size={28} />
-                  <strong>{stats.city_count}</strong>
-                  <span>cities</span>
-                </div>
-                <div className="journal-stat-tile">
-                  <BookText size={28} />
-                  <strong>{stats.photo_count}</strong>
-                  <span>photos</span>
-                </div>
-                <div className="journal-stat-tile">
-                  <TrendingUp size={28} />
-                  <strong>{stats.total_distance_km.toLocaleString()}</strong>
-                  <span>km traveled</span>
-                </div>
+              <h3 className="journal-section-heading">Your traveler levels</h3>
+              <div className="level-bar-grid">
+                <LevelBar
+                  icon={<Globe size={22} />}
+                  metricLabel="Countries"
+                  value={stats.country_count}
+                  unit="countries"
+                  tiers={COUNTRY_LEVELS}
+                />
+                <LevelBar
+                  icon={<MapPin size={22} />}
+                  metricLabel="Cities"
+                  value={stats.city_count}
+                  unit="cities"
+                  tiers={CITY_LEVELS}
+                />
+                <LevelBar
+                  icon={<BookText size={22} />}
+                  metricLabel="Photos"
+                  value={stats.photo_count}
+                  unit="photos"
+                  tiers={PHOTO_LEVELS}
+                />
+                <LevelBar
+                  icon={<TrendingUp size={22} />}
+                  metricLabel="Total distance"
+                  value={Math.round(stats.total_distance_km)}
+                  unit="km"
+                  tiers={DISTANCE_LEVELS}
+                />
               </div>
 
               {topActivity && (
@@ -314,7 +457,10 @@ export function JournalCollectionsPage() {
                             {photoUrl ? (
                               <img src={photoUrl} alt={r.name} />
                             ) : photoUrl === null ? (
-                              <div className="journal-rec-big-photo-empty">No preview</div>
+                              <div className="journal-rec-big-photo-fallback">
+                                <span className="journal-rec-big-photo-fallback-name">{r.name}</span>
+                                <span className="journal-rec-big-photo-fallback-country">{r.country}</span>
+                              </div>
                             ) : (
                               <div className="journal-rec-big-photo-loading">Loading…</div>
                             )}

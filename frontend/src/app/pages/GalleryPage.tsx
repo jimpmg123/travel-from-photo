@@ -6,9 +6,10 @@ import { absoluteImageUrl } from '../services/galleryApi'
 
 export function GalleryPage() {
   const navigate = useNavigate()
-  const { collections, loading, error, createEmptyCollection } = useSavedPlaces()
+  const { collections, loading, error, createEmptyCollection, deleteCollection } = useSavedPlaces()
   const [showNewDialog, setShowNewDialog] = useState(false)
   const [newName, setNewName] = useState('')
+  const [deletingName, setDeletingName] = useState<string | null>(null)
 
   const handleCreate = () => {
     const trimmed = newName.trim()
@@ -16,6 +17,21 @@ export function GalleryPage() {
     createEmptyCollection(trimmed)
     setNewName('')
     setShowNewDialog(false)
+  }
+
+  const handleDeleteCollection = async (name: string, count: number) => {
+    const msg = count === 0
+      ? `Delete empty collection "${name}"?`
+      : `Delete "${name}" and all ${count} place${count === 1 ? '' : 's'} in it? This cannot be undone.`
+    if (!window.confirm(msg)) return
+    setDeletingName(name)
+    try {
+      await deleteCollection(name)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete collection')
+    } finally {
+      setDeletingName(null)
+    }
   }
 
   if (loading) {
@@ -69,27 +85,41 @@ export function GalleryPage() {
               new Set(col.saves.map((s) => s.country).filter(Boolean) as string[]),
             )
             return (
-              <button
-                key={col.name}
-                type="button"
-                className="gallery-collection-card"
-                onClick={() => navigate(`/gallery/collection/${encodeURIComponent(col.name)}`)}
-              >
-                <div className="gallery-collection-cover">
-                  {coverUrl ? (
-                    <img src={coverUrl} alt={col.name} />
-                  ) : (
-                    <div className="gallery-collection-cover-empty">Empty collection</div>
-                  )}
-                </div>
-                <div className="gallery-collection-meta">
-                  <h3>{col.name}</h3>
-                  <p>
-                    {col.saves.length} place{col.saves.length === 1 ? '' : 's'}
-                    {countries.length > 0 ? ` · ${countries.slice(0, 2).join(', ')}` : ''}
-                  </p>
-                </div>
-              </button>
+              <div key={col.name} className="gallery-collection-card-wrap">
+                <button
+                  type="button"
+                  className="gallery-collection-card"
+                  onClick={() => navigate(`/gallery/collection/${encodeURIComponent(col.name)}`)}
+                >
+                  <div className="gallery-collection-cover">
+                    {coverUrl ? (
+                      <img src={coverUrl} alt={col.name} />
+                    ) : (
+                      <div className="gallery-collection-cover-empty">Empty collection</div>
+                    )}
+                  </div>
+                  <div className="gallery-collection-meta">
+                    <h3>{col.name}</h3>
+                    <p>
+                      {col.saves.length} place{col.saves.length === 1 ? '' : 's'}
+                      {countries.length > 0 ? ` · ${countries.slice(0, 2).join(', ')}` : ''}
+                    </p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className="gallery-collection-delete"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void handleDeleteCollection(col.name, col.saves.length)
+                  }}
+                  disabled={deletingName === col.name}
+                  aria-label={`Delete collection ${col.name}`}
+                  title="Delete collection"
+                >
+                  ×
+                </button>
+              </div>
             )
           })}
         </section>

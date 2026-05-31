@@ -59,7 +59,6 @@ export function TopBar({ onLogout }: TopBarProps) {
   const activeNavId = getActiveNavId(location.pathname)
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
 
-  // Close drawer whenever route changes.
   useEffect(() => {
     setIsMobileNavOpen(false)
   }, [location.pathname])
@@ -73,6 +72,8 @@ export function TopBar({ onLogout }: TopBarProps) {
     setIsMobileNavOpen(false)
   }
 
+  const visibleNavItems = navItems.filter((item) => item.id !== 'admin' || role === 'admin')
+
   return (
     <>
       <header className="topbar" aria-label="Application header">
@@ -85,12 +86,29 @@ export function TopBar({ onLogout }: TopBarProps) {
           </span>
         </button>
 
+        <nav className="topbar-nav" aria-label="Primary inline">
+          {visibleNavItems.map((item) => {
+            const Icon = navIcons[item.id]
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={`topbar-nav-button ${activeNavId === item.id ? 'is-active' : ''}`}
+                onClick={() => navigate(navPath[item.id] ?? '/')}
+                aria-label={item.label}
+                title={item.label}
+              >
+                {Icon ? <Icon className="topbar-nav-icon" /> : null}
+                <span className="topbar-nav-label">{item.label}</span>
+              </button>
+            )
+          })}
+        </nav>
+
         <div className="topbar-tools">
           {isLoggedIn ? (
             <>
-              {role === 'admin' && (
-                <span className="topbar-chip">Admin</span>
-              )}
+              {role === 'admin' && <span className="topbar-chip">Admin</span>}
               <span className="topbar-username">{userDisplayName}</span>
               <button
                 type="button"
@@ -122,25 +140,6 @@ export function TopBar({ onLogout }: TopBarProps) {
         </div>
       </header>
 
-      <nav className="desktop-side-nav" aria-label="Primary desktop">
-        {navItems.filter((item) => item.id !== 'admin' || role === 'admin').map((item) => {
-          const Icon = navIcons[item.id]
-          return (
-            <button
-              key={item.id}
-              type="button"
-              className={`desktop-side-button ${activeNavId === item.id ? 'is-active' : ''}`}
-              onClick={() => navigate(navPath[item.id] ?? '/')}
-              aria-label={item.label}
-              title={item.label}
-            >
-              {Icon ? <Icon className="desktop-side-icon" /> : null}
-              <span>{item.label}</span>
-            </button>
-          )
-        })}
-      </nav>
-
       {isMobileNavOpen && (
         <div className="mobile-nav-backdrop" onClick={() => setIsMobileNavOpen(false)} />
       )}
@@ -160,7 +159,7 @@ export function TopBar({ onLogout }: TopBarProps) {
         aria-label="Mobile primary"
         aria-hidden={!isMobileNavOpen}
       >
-        {navItems.filter((item) => item.id !== 'admin' || role === 'admin').map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = navIcons[item.id]
           return (
             <button

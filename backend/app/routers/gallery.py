@@ -260,6 +260,24 @@ def delete_saved_place(
     return {"deleted_id": save_id}
 
 
+@router.delete("/gallery/collections/{collection_name}")
+def delete_collection(
+    collection_name: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    deleted = (
+        db.query(SavedPlace)
+        .filter(
+            SavedPlace.user_id == current_user.id,
+            SavedPlace.collection_name == collection_name,
+        )
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"deleted_count": deleted, "collection_name": collection_name}
+
+
 @router.post("/gallery/collections/rename")
 def rename_collection(
     body: RenameCollectionIn,
