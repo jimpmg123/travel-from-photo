@@ -6,6 +6,7 @@ import { MapContainer, Marker, Polyline, TileLayer, Tooltip } from 'react-leafle
 
 import { editJournal, getJournalDetail, type JournalDetail, type JournalEntry } from '../services/journalApi'
 import { humanizeTag } from '../utils/tags'
+import { absoluteImageUrl } from '../services/galleryApi'
 
 const formatHeaderDate = (iso: string | null): string => {
   if (!iso) return ''
@@ -335,7 +336,16 @@ function DiaryCard({ entry, index, total }: { entry: JournalEntry; index: number
       </header>
 
       <div className="journal-diary-card-body">
-        <div className="journal-diary-card-photo photo-frame photo-frame--coast" />
+        {entry.image_url ? (
+          <img
+            className="journal-diary-card-photo"
+            src={absoluteImageUrl(entry.image_url) ?? undefined}
+            alt={`Photo ${index + 1}`}
+            loading="lazy"
+          />
+        ) : (
+          <div className="journal-diary-card-photo photo-frame photo-frame--coast" />
+        )}
 
         <div className="journal-diary-card-text">
           {tags.length > 0 && (

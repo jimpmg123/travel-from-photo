@@ -24,6 +24,7 @@ import {
   type JournalEntry,
 } from '../services/journalApi'
 import { humanizeTag } from '../utils/tags'
+import { absoluteImageUrl } from '../services/galleryApi'
 
 const DEFAULT_TITLE = 'Journal Title'
 
@@ -201,7 +202,16 @@ export function JournalResultPage() {
 
           return (
             <article key={entry.id} className="journal-result-entry">
-              <div className="journal-result-photo photo-frame photo-frame--coast" />
+              {entry.image_url ? (
+                <img
+                  className="journal-result-photo"
+                  src={absoluteImageUrl(entry.image_url) ?? undefined}
+                  alt={`Photo ${index + 1}`}
+                  loading="lazy"
+                />
+              ) : (
+                <div className="journal-result-photo photo-frame photo-frame--coast" />
+              )}
 
               <div className="journal-result-content">
                 <div className="journal-result-location">

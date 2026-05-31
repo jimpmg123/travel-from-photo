@@ -4345,6 +4345,7 @@
   min-height: 0;
   padding: 0;
   border-radius: 4px;
+  object-fit: cover;
 }
 
 .journal-result-content {
@@ -5877,6 +5878,8 @@
 .journal-diary-card-photo {
   border-radius: 4px;
   min-height: 280px;
+  width: 100%;
+  object-fit: cover;
 }
 
 .journal-diary-card-text {

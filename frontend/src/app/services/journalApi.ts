@@ -47,6 +47,7 @@ export type JournalJobStatus = {
 export type JournalEntry = {
   id: number
   image_id: number
+  image_url: string | null
   entry_order: number
   place_name: string | null
   country: string | null

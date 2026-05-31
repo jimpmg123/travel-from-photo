@@ -40,6 +40,7 @@ class JournalJobStatus(BaseModel):
 class JournalEntryResponse(BaseModel):
     id: int
     image_id: int
+    image_url: str | None = None
     entry_order: int
     place_name: str | None = None
     country: str | None = None

@@ -7,6 +7,7 @@ from app.models.journal import (
     JOURNAL_STATUS_DONE,
     JOURNAL_STATUS_PARTIAL_SUCCESS,
 )
+from app.models.saved_place import SavedPlace
 from app.models.user import User
 from app.repositories.journal_repository import (
     count_journal_entries,
@@ -174,10 +175,30 @@ def get_journal_detail(
     db: Session = Depends(get_db),
 ):
     journal = _require_owned_journal(db, current_user, journal_id)
-    entries = [
-        JournalEntryResponse.model_validate(entry, from_attributes=True)
-        for entry in get_journal_entries(db, journal.id)
-    ]
+    raw_entries = get_journal_entries(db, journal.id)
+
+    # Build image_id → gallery URL map in one query
+    image_ids = [e.image_id for e in raw_entries]
+    gallery_url_by_image_id: dict[int, str] = {}
+    if image_ids:
+        places = (
+            db.query(SavedPlace.image_metadata_id, SavedPlace.image_url)
+            .filter(
+                SavedPlace.user_id == current_user.id,
+                SavedPlace.image_metadata_id.in_(image_ids),
+                SavedPlace.image_url.isnot(None),
+            )
+            .all()
+        )
+        for img_id, img_url in places:
+            if img_id and img_url and img_id not in gallery_url_by_image_id:
+                gallery_url_by_image_id[img_id] = img_url
+
+    entries = []
+    for entry in raw_entries:
+        r = JournalEntryResponse.model_validate(entry, from_attributes=True)
+        r.image_url = gallery_url_by_image_id.get(entry.image_id)
+        entries.append(r)
     skipped_payload = (
         [JournalSkippedImage(image_id=item["image_id"], reason=item["reason"]) for item in journal.skipped]
         if journal.skipped else None
