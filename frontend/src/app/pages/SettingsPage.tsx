@@ -66,6 +66,7 @@ export function SettingsPage() {
     try {
       const saved = await updateSettings(settings)
       setSettings(saved)
+      document.documentElement.setAttribute('data-theme', saved.theme)
       setStatusMessage('Settings saved successfully.')
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : 'Failed to save settings.')

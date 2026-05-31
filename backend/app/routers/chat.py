@@ -126,8 +126,8 @@ def _serialize_message(message: ChatMessageModel) -> dict[str, Any]:
         "messageText": message.message_text,
         "imageId": message.image_id,
         "imageUrl": message.image_url,
-        "createdAt": message.created_at,
-        "readAt": message.read_at,
+        "createdAt": message.created_at.isoformat() if message.created_at else None,
+        "readAt": message.read_at.isoformat() if message.read_at else None,
     }
 
 

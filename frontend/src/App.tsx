@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import './App.css'
 import { useAuth } from './app/context/AuthContext'
+import { getSettings } from './app/services/socialApi'
 import { GenerationToast } from './app/components/GenerationToast'
 import { TopBar } from './app/components/TopBar'
 import { AdminPanelPage } from './app/pages/AdminPanelPage'
@@ -25,6 +26,16 @@ function App() {
   const navigate = useNavigate()
   const location = useLocation()
   const { isLoggedIn, role, logout } = useAuth()
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      document.documentElement.removeAttribute('data-theme')
+      return
+    }
+    getSettings()
+      .then((s) => { document.documentElement.setAttribute('data-theme', s.theme) })
+      .catch(() => {})
+  }, [isLoggedIn])
   const [latestSearchSession, setLatestSearchSession] = useState<SearchRun | null>(null)
   const [searchInFlight, setSearchInFlight] = useState(false)
   const [readyToast, setReadyToast] = useState<string | null>(null)

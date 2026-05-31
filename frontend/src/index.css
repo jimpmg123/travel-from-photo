@@ -86,3 +86,38 @@ p {
 #root {
   min-height: 100vh;
 }
+
+[data-theme="dark"] {
+  --ink: #e8e4dc;
+  --muted: #9a9080;
+  --accent: #5b9ec9;
+  --accent-warm: #d47a50;
+  --warm: #c47a3a;
+  --paper: #1a1814;
+  --paper-deep: #222018;
+  --line: #3a3630;
+  --line-soft: rgba(200, 180, 140, 0.12);
+  color-scheme: dark;
+}
+
+[data-theme="dark"] body {
+  background:
+    repeating-linear-gradient(0deg, transparent 0, transparent 28px, rgba(200, 180, 140, 0.02) 28px, rgba(200, 180, 140, 0.02) 29px),
+    repeating-linear-gradient(90deg, transparent 0, transparent 28px, rgba(200, 180, 140, 0.02) 28px, rgba(200, 180, 140, 0.02) 29px),
+    var(--paper);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] {
+    --ink: #e8e4dc;
+    --muted: #9a9080;
+    --accent: #5b9ec9;
+    --accent-warm: #d47a50;
+    --warm: #c47a3a;
+    --paper: #1a1814;
+    --paper-deep: #222018;
+    --line: #3a3630;
+    --line-soft: rgba(200, 180, 140, 0.12);
+    color-scheme: dark;
+  }
+}
