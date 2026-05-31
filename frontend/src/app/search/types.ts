@@ -76,6 +76,8 @@ export type SearchApiImageResponse = {
   candidates?: Candidate[]
   verdict?: 'confident' | 'likely' | 'suggestions' | 'failed' | null
   tier_reached?: number
+  tags?: string[]
+  chat_lounges?: Array<{ tag_key: string; display_name: string; emoji: string; description: string; category: string }>
 }
 
 export type SearchUploadAnalysis =
@@ -127,6 +129,8 @@ export type SearchImageResult = {
   // produced no candidates (failed analysis).
   candidates: Candidate[]
   verdict: SearchApiImageResponse['verdict']
+  standardTags: string[]
+  chatLounges: Array<{ tag_key: string; display_name: string; emoji: string; description: string; category: string }>
 }
 
 export type SearchResultBundle = {

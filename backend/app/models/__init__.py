@@ -3,6 +3,7 @@ from app.models.cache import ClipCacheEntry, PlacesCacheEntry
 from app.models.image_metadata import ImageMetadata
 from app.models.journal import Journal, JournalEntry
 from app.models.saved_place import SavedPlace
+from app.models.social import ChatMessage, ChatRoom, ModerationItem, UserSetting
 from app.models.user import User
 
 __all__ = [
@@ -14,4 +15,8 @@ __all__ = [
     "PlacesCacheEntry",
     "OTP",
     "SavedPlace",
+    "UserSetting",
+    "ChatRoom",
+    "ChatMessage",
+    "ModerationItem",
 ]

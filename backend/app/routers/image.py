@@ -1,6 +1,7 @@
 from fastapi import APIRouter, File, Form, UploadFile
 
 from app.services.search import analyze_uploaded_search_image
+from app.services.chat_tags import lounge_payload_for_tags, normalize_lounge_tags
 
 router = APIRouter()
 
@@ -20,4 +21,8 @@ async def upload_image(
         user_hint=user_hint,
         force_openai_retry=force_openai_retry,
     )
-    return analysis.to_dict()
+    payload = analysis.to_dict()
+    tags = normalize_lounge_tags(payload)
+    payload["tags"] = tags
+    payload["chat_lounges"] = lounge_payload_for_tags(tags)
+    return payload

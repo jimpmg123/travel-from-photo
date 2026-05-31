@@ -364,6 +364,7 @@ function ImageResultBlock({
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
   const [isMapEditable, setIsMapEditable] = useState(false)
+  const navigate = useNavigate()
 
   const startNameEdit = () => {
     setNameDraft(effectiveTop?.place_name ?? effectiveTop?.formatted_address ?? '')
@@ -483,6 +484,27 @@ function ImageResultBlock({
                     Save to Gallery
                   </button>
                 </div>
+
+                {result.chatLounges.length > 0 ? (
+                  <div className="join-lounges-card">
+                    <div>
+                      <h4>Join Lounges</h4>
+                      <p>These rooms are recommended from the image tags returned by Search.</p>
+                    </div>
+                    <div className="join-lounges-list">
+                      {result.chatLounges.slice(0, 3).map((lounge) => (
+                        <button
+                          key={lounge.tag_key}
+                          type="button"
+                          className="join-lounge-chip"
+                          onClick={() => navigate(`/chat?tags=${encodeURIComponent(result.standardTags.join(','))}`)}
+                        >
+                          {lounge.emoji} {lounge.display_name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>

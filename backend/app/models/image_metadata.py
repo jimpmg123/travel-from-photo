@@ -37,6 +37,7 @@ class ImageMetadata(Base):
     metadata_case: Mapped[str] = mapped_column(String(20), nullable=False)
 
     raw_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

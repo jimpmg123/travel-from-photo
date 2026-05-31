@@ -13,7 +13,17 @@ from app.core.config import OPENAI_API_KEY, OPENAI_VISION_MODEL
 from app.services.search.contracts import RawSignal, SearchHintContext
 
 logger = logging.getLogger(__name__)
-client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+_client: AsyncOpenAI | None = None
+
+
+def _get_openai_client() -> AsyncOpenAI | None:
+    global _client
+    if not OPENAI_API_KEY:
+        logger.warning("OPENAI_API_KEY is not configured; GPT main voter is disabled.")
+        return None
+    if _client is None:
+        _client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+    return _client
 
 
 def _encode_image(image_path: Path) -> str:
@@ -70,6 +80,10 @@ async def analyze_gpt_main_voter(
             "Respond strictly in JSON format with a top-level 'candidates' array. "
             "Example format: {\"candidates\": [{\"place_name\": \"...\", \"score\": 0.85, \"reasoning\": \"...\"}]}"
         )
+
+        client = _get_openai_client()
+        if client is None:
+            return []
 
         response = await asyncio.wait_for(
             client.chat.completions.create(

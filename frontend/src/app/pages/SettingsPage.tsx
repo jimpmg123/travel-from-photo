@@ -1,25 +1,106 @@
-import { Settings } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Bell, Lock, Palette } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { getSettings, updateSettings, type SettingsPayload } from '../services/socialApi'
+
+const fallbackSettings: SettingsPayload = {
+  displayName: '',
+  defaultPrivacy: 'private',
+  theme: 'system',
+  emailNotifications: true,
+}
 
 export function SettingsPage() {
+  const { user } = useAuth()
+  const [settings, setSettings] = useState<SettingsPayload>({
+    ...fallbackSettings,
+    displayName: user ? `${user.firstName} ${user.lastName}`.trim() : '',
+  })
+  const [statusMessage, setStatusMessage] = useState('Loading settings...')
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    let ignore = false
+    getSettings()
+      .then((payload) => {
+        if (!ignore) {
+          setSettings(payload)
+          setStatusMessage('Settings loaded from the backend.')
+        }
+      })
+      .catch((error: Error) => {
+        if (!ignore) setStatusMessage(error.message)
+      })
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    try {
+      const saved = await updateSettings(settings)
+      setSettings(saved)
+      setStatusMessage('Settings saved successfully.')
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : 'Failed to save settings.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <div className="stack-xl">
       <section className="section-heading">
         <div>
           <p className="eyebrow">Settings</p>
-          <h2>Account and preferences</h2>
+          <h2>Profile preferences and privacy defaults</h2>
         </div>
-        <p className="section-copy">
-          Notification settings, privacy controls, and account management will live here.
-        </p>
+        <p className="section-copy">Save display, privacy, theme, and notification preferences.</p>
       </section>
 
-      <div className="panel" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', padding: '3rem' }}>
-        <Settings size={40} />
-        <strong>Coming soon</strong>
-        <p className="muted-copy">
-          This space is reserved for settings once the auth backend is connected.
-        </p>
-      </div>
+      <section className="settings-layout">
+        <article className="panel content-panel">
+          <div className="section-mini"><Palette /><h3>Account settings</h3></div>
+          <div className="form-stack">
+            <label className="field">
+              <span>Display name</span>
+              <input value={settings.displayName} onChange={(e) => setSettings((s) => ({ ...s, displayName: e.target.value }))} />
+            </label>
+            <label className="field">
+              <span>Default privacy</span>
+              <select value={settings.defaultPrivacy} onChange={(e) => setSettings((s) => ({ ...s, defaultPrivacy: e.target.value as SettingsPayload['defaultPrivacy'] }))}>
+                <option value="private">Private</option>
+                <option value="unlisted">Unlisted</option>
+                <option value="public">Public</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Theme</span>
+              <select value={settings.theme} onChange={(e) => setSettings((s) => ({ ...s, theme: e.target.value as SettingsPayload['theme'] }))}>
+                <option value="system">System</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </label>
+            <label className="toggle-row">
+              <span><Bell size={18} /> Email notifications</span>
+              <input type="checkbox" checked={settings.emailNotifications} onChange={(e) => setSettings((s) => ({ ...s, emailNotifications: e.target.checked }))} />
+            </label>
+            <button type="button" className="button-primary" onClick={handleSave} disabled={isSaving}>{isSaving ? 'Saving...' : 'Save settings'}</button>
+            <p className="field-note">{statusMessage}</p>
+          </div>
+        </article>
+
+        <article className="panel content-panel">
+          <div className="section-mini"><Lock /><h3>Security preferences</h3></div>
+          <p className="muted-copy">JWT authentication protects profile, settings, chat, and admin API requests.</p>
+          <div className="result-grid">
+            <div className="result-card"><span className="result-label">API key safety</span><strong>Backend only</strong><p>OpenAI and map keys are read from environment variables.</p></div>
+            <div className="result-card"><span className="result-label">Private data</span><strong>Owner scoped</strong><p>Private content is tied to authenticated users.</p></div>
+          </div>
+        </article>
+      </section>
     </div>
   )
 }

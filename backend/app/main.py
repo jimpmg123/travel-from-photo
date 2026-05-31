@@ -6,6 +6,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.auth.router import router as auth_router
 from app.routers.gallery import router as gallery_router
+from app.routers.admin import router as admin_router
+from app.routers.chat import router as chat_router
 from app.routers.geocode import router as geocode_router
 from app.routers.image import router as image_router
 from app.routers.journal import router as journal_router
@@ -37,7 +39,12 @@ def register_routes(app: FastAPI) -> None:
         return {
             "message": "Travel From Photo API is running",
             "docs": "/docs",
+            "health": f"{API_PREFIX}/health",
         }
+
+    @app.get(f"{API_PREFIX}/health")
+    def health():
+        return {"status": "ok"}
 
     app.include_router(auth_router, prefix=API_PREFIX)
     app.include_router(image_router, prefix=API_PREFIX)
@@ -45,6 +52,8 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(profile_router, prefix=API_PREFIX)
     app.include_router(gallery_router, prefix=API_PREFIX)
     app.include_router(geocode_router, prefix=API_PREFIX)
+    app.include_router(chat_router, prefix=API_PREFIX)
+    app.include_router(admin_router, prefix=API_PREFIX)
 
 
 def create_app() -> FastAPI:
