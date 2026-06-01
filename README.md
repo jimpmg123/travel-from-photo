@@ -1,234 +1,520 @@
 # Travel From Photo
 
-Travel From Photo is a web application that helps users recover likely travel locations from photos. A user uploads an image, the backend analyzes visual clues, and the app returns possible places with confidence scores. Users can save results to a gallery, create travel journals, and join tag-based travel chat lounges.
+Travel From Photo is an AI-powered web application that helps users recover likely travel locations from uploaded photos. A user uploads an image, the backend fuses signals from multiple vision and map APIs, and returns ranked location candidates with confidence scores. Users can save results to a personal gallery, generate travel journals, and join tag-based travel chat lounges with other users.
 
-## Current Project Scope
-
-The merged deployment version includes:
-
-- Auth, register, login, and JWT-protected routes
-- Search with image analysis and location candidates
-- Gallery save and browse flow
-- Journal draft and saved journal flow
-- Profile and Settings pages
-- Admin Panel for user management and moderation
-- Live Chat with 13 permanent tag-based lounges
-- PostgreSQL database with Alembic migrations
-- Docker Compose deployment for frontend, backend, and database
+---
 
 ## Team Members
 
-- Jaemin Jeon
-- Younghak Yoo
-- Jinu Hong
+| Name | Role |
+|------|------|
+| Jaemin Jeon | Frontend, Backend Integration, Social Track |
+| Younghak Yoo | Frontend, Backend Integration, Image Track(Search, Journal, Gallery) |
 
-## Problem Statement
+---
 
-Travelers often lose location information when photos are moved, uploaded, or shared. Later, they may remember the memory but not the exact place. Existing image search tools can return broad or unclear results, especially for food photos, indoor places, or visually generic scenes. Travel From Photo gives users a focused workflow: upload one photo, review likely location candidates, select or manually correct the result, then save it for future memories.
+## Table of Contents
 
-## System Overview
+1. [System Architecture](#system-architecture)
+2. [Prerequisites](#prerequisites)
+3. [Checking Out the Source Code](#1-checking-out-the-source-code)
+4. [Environment Configuration](#2-environment-configuration)
+5. [Option A — Build and Run with Docker (Recommended)](#3-option-a--build-and-run-with-docker-recommended)
+6. [Option B — Run Locally Without Docker](#4-option-b--run-locally-without-docker)
+7. [Database Setup and Migrations](#5-database-setup-and-migrations)
+8. [Test Accounts and Admin Access](#6-test-accounts-and-admin-access)
+9. [Testing the Application](#7-testing-the-application)
+10. [Build Verification](#8-build-verification)
+11. [API Reference](#9-api-reference)
+12. [Important Notes](#10-important-notes)
 
-```text
-React/Vite frontend
-        ↓
-Nginx reverse proxy
-        ↓
-FastAPI backend
-        ↓
-PostgreSQL database
+---
+
+## System Architecture
+
+### Docker deployment (production)
+
+```
+Browser
+  │
+  ├─► port 80   → frontend container (Nginx)
+  │                  ├─ serves React static files
+  │                  ├─ /api/*      → proxy → backend:8000
+  │                  ├─ /uploads/*  → proxy → backend:8000
+  │                  └─ WebSocket upgrade (ws/wss) → backend:8000
+  │
+  └─► port 8000 → backend container (FastAPI / Uvicorn)
+                      │
+                      ├─ PostgreSQL (db container, port 5432)
+                      ├─ OpenAI API (image location analysis, journal generation)
+                      └─ Google Maps / Vision API (landmark, geocoding, places, Logo, OCR, Web)
 ```
 
-External services such as OpenAI and Google APIs are configured through environment variables. Search and journal features may require valid API keys.
+The frontend container runs Nginx, which serves the compiled React app and proxies all `/api/*` and `/uploads/*` requests to the backend. The browser communicates with port 80 for the app. All three containers are managed by Docker Compose.
 
-## Supported Operating Systems
+### Local development (without Docker)
 
-These instructions are intended for:
+```
+Browser (localhost:5173) → Vite dev server → React app
+Browser (localhost:8000) → FastAPI (Uvicorn, --reload)
+                               └─ PostgreSQL (local or Docker)
+```
 
-- Windows 10/11 with Docker Desktop
-- macOS with Docker Desktop
-- Linux with Docker Engine and Docker Compose plugin
+Nginx is not used during local development. The Vite dev server communicates with the backend at `http://localhost:8000/api`.
 
-## Quick Start with Docker
+---
 
-From the repository root:
+## Prerequisites
+
+### Docker setup (recommended)
+
+| OS | Requirement |
+|----|-------------|
+| Windows 10/11 | Docker Desktop 4.x with WSL 2 backend enabled |
+| macOS | Docker Desktop 4.x |
+| Linux | Docker Engine + Docker Compose plugin (`apt install docker-compose-plugin`) |
 
 ```bash
-cp .env.example .env
+docker --version        # 24.x or later
+docker compose version  # v2.x or later
 ```
 
-Edit `.env` and set at least:
+### Local setup (without Docker)
 
-```text
-OPENAI_API_KEY=your-openai-api-key
-JWT_SECRET=replace-with-a-long-random-string
+| Tool | Version |
+|------|---------|
+| Python | 3.10 or later |
+| Node.js | 20 LTS or later |
+| PostgreSQL | 14 or later |
+
+---
+
+## 1. Checking Out the Source Code
+
+```bash
+git clone https://github.com/jimpmg123/travel-from-photo.git
+cd travel-from-photo
 ```
 
-Then run:
+**Stable release:**
+
+```bash
+git checkout main
+```
+
+**Latest development:**
+
+```bash
+git checkout dev
+```
+
+**Update after initial checkout:**
+
+```bash
+git pull
+```
+
+---
+
+## 2. Environment Configuration
+
+Create a `.env` file in the `backend/` directory and fill in your values:
+
+```env
+# Required for Search (image location analysis) and Journal generation
+OPENAI_API_KEY=sk-...
+
+# Required for landmark detection, geocoding, and Places lookup
+GOOGLE_MAPS_API_KEY=AIza...
+
+# Used to sign JWT tokens. Replace with a long random string before deployment.
+# Generate one: python -c "import secrets; print(secrets.token_urlsafe(48))"
+JWT_SECRET=change-this-in-production
+
+# JWT algorithm — leave as HS256
+JWT_ALGORITHM=HS256
+
+# Token expiry in minutes (e.g. 60 = 1 hour, 10080 = 7 days)
+JWT_EXPIRE_MINUTES=60
+
+# Required for registration OTP emails.
+# EMAIL_FROM must be a Gmail address.
+# EMAIL_PASSWORD must be a Gmail App Password (not your regular password).
+# Generate one at: Google Account → Security → 2-Step Verification → App passwords
+EMAIL_FROM=your-email@gmail.com
+EMAIL_PASSWORD=your-gmail-app-password
+```
+
+> **Note:** Without `OPENAI_API_KEY`, the AI reasoning tier in Search is skipped and journal generation will not produce text. Without `GOOGLE_MAPS_API_KEY`, location resolution and geocoding will not work. Both keys are required for full functionality.
+
+---
+
+## 3. Option A — Build and Run with Docker (Recommended)
+
+This is the fastest way to get the full stack running. Docker builds all three services and wires them together automatically.
 
 ```bash
 docker compose up --build
 ```
 
-Open:
-
-- Frontend: `http://localhost`
-- Backend docs: `http://localhost:8000/docs`
-- Backend health: `http://localhost:8000/api/health`
-
-## Local Test Accounts
-
-Seed local test data after Docker is running:
+First build takes 3–8 minutes (Python and npm dependencies). Subsequent starts are faster:
 
 ```bash
-docker compose exec backend python -m app.scripts.seed_complete
+docker compose up
 ```
 
-Use these accounts:
+| URL | Purpose |
+|-----|---------|
+| `http://localhost` | Main application |
+| `http://localhost:8000/docs` | Interactive API documentation (Swagger UI) |
+| `http://localhost:8000/api/health` | Backend health check |
 
-| Role | Email | Password |
-|---|---|---|
-| Admin | `jaemin@example.com` | `Travel2026!` |
-| Traveler | `mina@example.com` | `Travel2026!` |
+Stop all containers:
 
-Admin users can access the Admin Panel. Traveler users are redirected away from the Admin route.
+```bash
+docker compose down
+```
 
-## Build and Test Without Docker
+Full reset including all database data:
 
-### Backend
+```bash
+docker compose down -v
+```
+
+**Windows:** If port 80 is in use (IIS or another process), set `FRONTEND_HOST_PORT=3000` in `.env` and open `http://localhost:3000`.
+
+**macOS Apple Silicon (M1/M2/M3):** Docker Desktop handles ARM cross-compilation automatically. No extra steps needed.
+
+---
+
+## 4. Option B — Run Locally Without Docker
+
+Use this if you want fast backend hot-reload during development. You still need a PostgreSQL instance running.
+
+### Step 1 — Start only the database
+
+Using Docker for just the database is the easiest option:
+
+```bash
+docker compose up -d db
+```
+
+Or use a local PostgreSQL installation. The backend connects using these defaults: `travel_user / travel_password @ 127.0.0.1:5432 / travel_db`. These can be overridden by setting `DATABASE_URL` directly in `backend/.env`.
+
+### Step 2 — Run the backend
+
+**macOS / Linux:**
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate  # macOS/Linux
-# .venv\Scripts\activate  # Windows PowerShell
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-### Frontend
+**Windows (PowerShell):**
+
+```powershell
+cd backend
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
+```
+
+Backend is ready when you see:
+
+```
+INFO:     Application startup complete.
+```
+
+### Step 3 — Run the frontend
+
+Open a second terminal:
 
 ```bash
 cd frontend
 npm install
-npm run build
 npm run dev
 ```
 
-Vite dev server:
+Open `http://localhost:5173`.
 
-```text
-http://localhost:5173
+---
+
+## 5. Database Setup and Migrations
+
+Alembic manages all schema changes. Run this after the first checkout, after pulling new code, or whenever migration files change:
+
+```bash
+cd backend
+alembic upgrade head
 ```
 
-## Final Verification Commands
+### Migration history
 
-Frontend build:
+| Revision | Description |
+|----------|-------------|
+| `5170ad3cfe71` | Initial auth, users, image metadata, saved places |
+| `b2f9c41dd7a3` | Journal and journal entry schema |
+| `c4a8e91f5d12` | Saved places |
+| `d92a1b3e7c45` | Image metadata → saved place foreign key |
+| `e7b1c2d3a4f5` | Social tables: user settings, chat rooms, chat messages, moderation items |
+| `f8a2c7d1e9b3` | `chat_messages.image_url` column |
+| `b9c3e1f7d2a8` | Repair chat_rooms table and fix chat_messages schema |
+| `c7d4f2e8b1a9` | `image_metadata.tags` column |
+| `d5e6f7a8b9c0` | `saved_places.privacy` column |
+
+Check current state:
+
+```bash
+cd backend
+alembic current   # show applied revision
+alembic heads     # show expected head revision
+```
+
+---
+
+## 6. Test Accounts and Admin Access
+
+### Seed demo data
+
+After the backend is running, execute the seed script once:
+
+**Docker:**
+
+```bash
+docker compose exec backend python -m app.scripts.seed_complete
+```
+
+**Local — Windows:**
+
+```powershell
+cd backend
+.venv\Scripts\python.exe -m app.scripts.seed_complete
+```
+
+**Local — macOS/Linux:**
+
+```bash
+cd backend
+python -m app.scripts.seed_complete
+```
+
+### Test account credentials
+
+| Role | Email | Password |
+|------|-------|----------|
+| **Admin** | `jaemin@example.com` | `Travel2026!` |
+| Traveler | `mina@example.com` | `Travel2026!` |
+
+### Accessing the Admin Panel
+
+Log in with the admin account. The **Admin** tab appears in the navigation bar (admin role only). The admin panel provides:
+
+- User list with search, role toggle (traveler ↔ admin), and account enable/disable
+- Moderation queue showing bug reports submitted by users and other flagged items
+
+### Promoting an existing account to admin
+
+**Via Docker:**
+
+```bash
+docker compose exec db psql -U travel_user -d travel_db \
+  -c "UPDATE users SET role = 'admin' WHERE email = 'your@email.com';"
+```
+
+**Local psql:**
+
+```bash
+psql -U travel_user -d travel_db \
+  -c "UPDATE users SET role = 'admin' WHERE email = 'your@email.com';"
+```
+
+Log out and log back in after the update.
+
+---
+
+## 7. Testing the Application
+
+The project does not include automated unit tests. Testing is performed by walking through the core user flows described below.
+
+### Manual test checklist
+
+| # | Feature | Steps | Expected result |
+|---|---------|-------|-----------------|
+| 1 | **Registration** | Sign Up → fill form → enter OTP sent to email | Account created, redirected to home |
+| 2 | **Login** | Enter credentials → submit | JWT token issued, home page loads |
+| 3 | **Search** | Upload a travel photo + optional country/city hint → Run Search | Location candidates returned within ~30 seconds |
+| 4 | **Gallery save** | From Search results → Save a candidate to gallery | Photo appears in Gallery with map pin |
+| 5 | **Gallery browse** | Open Gallery → view collections, rename, delete | Collections and photos display correctly |
+| 6 | **Journal creation** | Gallery → select photos → Create Journal → wait | Journal entries with AI-written text generated per photo |
+| 7 | **Journal detail** | Open a saved journal → browse entries with arrow keys | Entry photos and journal text displayed per entry |
+| 8 | **Live Chat** | Chat → select a lounge → send a message | Message appears in real time |
+| 9 | **Chat from Search** | After Search, click the recommended lounge link | Chat opens with matching tag lounge pre-selected |
+| 10 | **Dark mode** | Settings → Theme: Dark → Save | Page background and panels turn dark immediately |
+| 11 | **Bug report** | Settings → Report a bug → fill form → submit | Success message; item appears in Admin moderation queue |
+| 12 | **Admin panel** | Log in as admin → open Admin tab | User table and moderation queue load correctly |
+
+### API health check
+
+```bash
+curl http://localhost:8000/api/health
+# Expected: {"status":"ok"}
+```
+
+### Interactive API docs
+
+Open `http://localhost:8000/docs` in a browser to see all endpoints, inspect request and response schemas, and send test requests directly.
+
+### WebSocket connectivity
+
+The Live Chat panel header shows the connection state:
+
+- **WebSocket online** — real-time connection active
+- **REST polling fallback** — WebSocket unavailable; messages refresh every 15 seconds
+
+Both modes deliver messages. The fallback activates automatically.
+
+---
+
+## 8. Build Verification
+
+Run these checks before committing or deploying:
+
+**Frontend TypeScript check and production build:**
 
 ```bash
 cd frontend
-npm install
 npm run build
+# Success: prints "✓ built in Xs" with no errors
 ```
 
-Backend compile check:
+**Backend syntax check:**
 
 ```bash
 cd backend
 python -m compileall -q app
+# No output = no syntax errors
 ```
 
-Alembic head check:
+**Migration chain integrity:**
 
 ```bash
 cd backend
-alembic heads
+alembic check
 ```
 
-Docker smoke test after seeding:
+**Docker end-to-end build test:**
 
 ```bash
-python scripts/local_smoke_check.py
+docker compose build
+docker compose up -d
+curl http://localhost/api/health   # Expected: {"status":"ok"}
+docker compose down
 ```
 
-## Database
+---
 
-The project uses PostgreSQL. The backend applies Alembic migrations on startup through `backend/start.sh`.
+## 9. API Reference
 
-Final migration head:
+All endpoints are prefixed with `/api`. Full interactive documentation is available at `http://localhost:8000/docs` when the backend is running.
 
-```text
-e7b1c2d3a4f5
-```
+### Authentication
 
-The B-track social migration adds:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/auth/register` | Register a new account (triggers OTP email) |
+| `POST` | `/api/auth/verify-otp` | Verify the 6-digit OTP to activate account |
+| `POST` | `/api/auth/login` | Log in and receive a JWT token |
+| `GET` | `/api/auth/me` | Get the current user's basic info |
 
-- `user_settings`
-- `chat_rooms`
-- `chat_messages`
-- `moderation_items`
-- `image_metadata.tags`
+### User profile and settings
 
-## Live Chat Tag Lounges
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/users/me` | Get full profile for current user |
+| `GET` | `/api/profile` | Get profile details |
+| `PUT` | `/api/profile` | Update profile (name, bio, email) |
+| `GET` | `/api/settings` | Get user settings (theme, privacy, notifications) |
+| `PATCH` | `/api/settings` | Update user settings |
 
-Live Chat uses 13 permanent tag-based lounges instead of city-specific rooms. Search analysis produces tags such as `historical`, `urban`, `food`, or `sunset`. The results page recommends matching lounges and routes users into Live Chat.
+### Search
 
-Key endpoints:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/image` | Upload a photo for location analysis; returns ranked candidates |
 
-```text
-GET  /api/chat-rooms
-GET  /api/chat-rooms/{room_id}/messages?limit=50
-POST /api/chat-rooms/{room_id}/messages
-WS   /api/ws/chat/{room_id}?token=JWT
-POST /api/chat-tags/normalize
-```
+### Gallery
 
-More detail is in `docs/LIVE_CHAT_TAG_LOUNGES.md`.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/gallery/collections` | List all saved places grouped by collection |
+| `POST` | `/api/gallery/saves` | Save a location result to gallery |
+| `PATCH` | `/api/gallery/saves/{save_id}` | Update a saved place (name, collection, coordinates) |
+| `DELETE` | `/api/gallery/saves/{save_id}` | Delete a saved place |
+| `POST` | `/api/gallery/collections/rename` | Rename a collection |
+| `DELETE` | `/api/gallery/collections/{collection_name}` | Delete all saves in a collection |
 
-## API Documentation
+### Journal
 
-- Final API design: `docs/API_DESIGN_FINAL.md`
-- Live Chat design: `docs/LIVE_CHAT_TAG_LOUNGES.md`
-- Deployment checklist: `docs/FINAL_DEPLOYMENT_CHECKLIST.md`
-- Test plan: `docs/FINAL_TEST_PLAN.md`
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/journals/generate` | Start a journal generation job (background task) |
+| `GET` | `/api/journals/jobs/{job_id}` | Poll job status |
+| `GET` | `/api/journals` | List all journals for current user |
+| `GET` | `/api/journals/{journal_id}` | Get journal detail with all entries |
+| `PATCH` | `/api/journals/{journal_id}` | Edit journal title or entry text |
+| `DELETE` | `/api/journals/{journal_id}` | Delete a journal |
+| `GET` | `/api/journals/stats` | Get travel statistics (countries, cities, photo count) |
+| `GET` | `/api/journals/recommendations` | Get AI-generated next destination recommendations |
 
-## Bug Tracking
+### Live Chat
 
-Use GitHub Issues for bugs. A bug report template is included in:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/chat-rooms` | List all 13 tag-based lounges |
+| `GET` | `/api/chat-rooms/recommendations` | Get lounges recommended for given tags or image |
+| `GET` | `/api/chat-rooms/{room_id}/messages` | Get recent messages in a lounge |
+| `POST` | `/api/chat-rooms/{room_id}/messages` | Send a message via REST (WebSocket fallback) |
+| `POST` | `/api/chat-tags/normalize` | Map search analysis output to lounge tag keys |
+| `WS` | `/api/ws/chat/{room_id}?token=JWT` | WebSocket connection for real-time chat |
 
-```text
-.github/ISSUE_TEMPLATE/bug_report.md
-```
+### Geocoding
 
-Bug tracking instructions are in:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/geocode/reverse` | Reverse geocode coordinates to a place name |
 
-```text
-docs/BUG_TRACKING.md
-```
+### Reports
 
-For completed features, someone who did not implement the feature should verify it and open an issue for any problem found.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/reports` | Submit a bug report (any authenticated user) |
 
-## Milestone 4 Documents
+### Admin (admin role required)
 
-For the beta release assignment, update or submit:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/admin/summary` | Dashboard counts (users, open moderation items, chat messages) |
+| `GET` | `/api/admin/users` | List users with optional search query |
+| `PATCH` | `/api/admin/users/{user_id}` | Update user role or status |
+| `GET` | `/api/admin/moderation` | List all moderation items including bug reports |
+| `POST` | `/api/admin/moderation` | Create a moderation item (admin-initiated) |
+| `PATCH` | `/api/admin/moderation/{item_id}` | Resolve a moderation item |
 
-- README setup/build/test instructions
-- Final API documentation
-- Updated schedule/progress notes
-- Bug tracking list
-- Individual and group progress update
-- Deployment link
+---
 
-A template is provided in:
+## 10. Important Notes
 
-```text
-docs/MILESTONE_4_PROGRESS_UPDATE_TEMPLATE.md
-```
-
-## Important Notes
-
-- Do not commit `.env` files.
-- Do not commit API keys.
-- Do not commit `frontend/node_modules`, `frontend/dist`, backend caches, or uploaded runtime files.
-- Registration uses email OTP. For local testing, the seeded accounts are easier unless email credentials are configured.
-- Search quality depends on image clues and external API responses.
+- **Do not commit `.env` files.** They are listed in `.gitignore`.
+- **Do not commit API keys** to any file tracked by git.
+- **Registration requires working email credentials.** For local testing without email, use the seeded demo accounts instead.
+- **Search quality depends on API keys.** Without `OPENAI_API_KEY`, the AI reasoning tier is skipped and results rely on Google Vision signals only. Without `GOOGLE_MAPS_API_KEY`, location resolution and geocoding do not work.
+- **CLIP/Torch requires at least 4 GB RAM.** On machines with less memory, the backend may crash on startup when loading the model.
+- **Run `alembic upgrade head` after pulling new code** that adds migration files. If the gallery fails to load or journal generation returns a 500 error, a pending migration is the most likely cause.
+- Uploaded gallery files are stored in `backend/uploads/gallery/` and served at `/uploads/gallery/<filename>`. This directory is excluded from git.
+- Google Vision API calls are authenticated via `GOOGLE_MAPS_API_KEY`. No separate service account file is required.
