@@ -129,6 +129,7 @@ export type SearchImageResult = {
   // produced no candidates (failed analysis).
   candidates: Candidate[]
   verdict: SearchApiImageResponse['verdict']
+  tierReached: number | null
   standardTags: string[]
   chatLounges: Array<{ tag_key: string; display_name: string; emoji: string; description: string; category: string }>
 }

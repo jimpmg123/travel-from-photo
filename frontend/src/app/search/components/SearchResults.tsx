@@ -317,6 +317,87 @@ function CandidateModal({
   )
 }
 
+const SIGNAL_SOURCE_INFO: { key: string; label: string; description: string }[] = [
+  { key: 'exif_gps', label: 'GPS metadata', description: 'EXIF data in the photo file directly named the location' },
+  { key: 'vision_landmark', label: 'Landmark Detection', description: 'Google recognized this as a known landmark in its database' },
+  { key: 'vision_web', label: 'Web Image Search', description: 'Visually similar photos found online pointed at this place' },
+  { key: 'vision_logo', label: 'Logo Detection', description: 'A brand or business logo in the photo was identified' },
+  { key: 'vision_ocr', label: 'Text OCR', description: 'Readable text in the photo (signs, menus) matched this place' },
+  { key: 'gpt4o_main', label: 'AI Vision Reasoning', description: 'GPT-4o reasoned about what is visible to propose this place' },
+]
+
+function getVerdictExplanation(verdict: string | null, sourceCount: number, tierReached: number | null): string {
+  if (verdict === 'confident') {
+    if (sourceCount >= 2) {
+      return `Strong match — ${sourceCount} independent signals agreed on this location.`
+    }
+    return 'Strong match — a high-confidence signal directly named this location.'
+  }
+  if (verdict === 'likely') {
+    return `Likely match — signals point toward this answer but not unanimously. Verify before saving.`
+  }
+  if (verdict === 'suggestions') {
+    return `Weak match — only fuzzy signals were available. The top candidate is a best guess; add a hint to refine.`
+  }
+  if (verdict === 'failed') {
+    return tierReached === 0
+      ? 'No location identified — the image had no EXIF GPS and no Vision API recognized anything.'
+      : 'No location identified — all signal sources came back empty or contradictory.'
+  }
+  return ''
+}
+
+function DiagnosticsPanel({ result }: { result: SearchImageResult }) {
+  const [open, setOpen] = useState(false)
+  const top = result.candidates?.[0]
+  const usedSources = new Set(top?.contributing_sources ?? [])
+  const explanation = getVerdictExplanation(result.verdict ?? null, usedSources.size, result.tierReached)
+
+  const tip = (() => {
+    if (result.verdict === 'confident') return null
+    if (result.verdict === 'failed') {
+      return 'Try a sharper, head-on photo where the main subject fills 60%+ of the frame, or add a country/city hint.'
+    }
+    if (usedSources.size <= 1) {
+      return 'Only one signal source contributed. A different angle of the same place (closer, more iconic view) often unlocks Landmark/Web matches.'
+    }
+    return 'Add a more specific hint with the "Re-search this photo" button if the top match looks wrong.'
+  })()
+
+  return (
+    <div className="diagnostics-panel">
+      <button
+        type="button"
+        className={`diagnostics-toggle${open ? ' is-open' : ''}`}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span>How we got this result</span>
+        <span className="diagnostics-chevron">{open ? '▾' : '▸'}</span>
+      </button>
+      {open ? (
+        <div className="diagnostics-body">
+          <p className="diagnostics-explanation">{explanation}</p>
+          <ul className="diagnostics-sources">
+            {SIGNAL_SOURCE_INFO.map((info) => {
+              const used = usedSources.has(info.key)
+              return (
+                <li key={info.key} className={`diagnostics-source${used ? ' is-used' : ' is-unused'}`}>
+                  <span className="diagnostics-source-mark">{used ? '✓' : '—'}</span>
+                  <div>
+                    <strong>{info.label}</strong>
+                    <span>{used ? info.description : 'Did not contribute to this result'}</span>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+          {tip ? <p className="diagnostics-tip">💡 {tip}</p> : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function ImageResultBlock({
   result,
   index,
@@ -545,6 +626,8 @@ function ImageResultBlock({
             </div>
           ) : null}
 
+          <DiagnosticsPanel result={result} />
+
           {!isConfident && !showResearchPanel ? (
             <div className="research-bar">
               <p>Not confident this is right? Add a hint and re-search this photo.</p>
@@ -584,6 +667,7 @@ function ImageResultBlock({
             <strong>No location identified</strong>
             <p>{result.summary ?? 'Add a hint and retry to refine the search.'}</p>
           </div>
+          <DiagnosticsPanel result={result} />
           {!showResearchPanel ? (
             <div className="research-bar">
               <p>Give it a hint and we'll re-run.</p>

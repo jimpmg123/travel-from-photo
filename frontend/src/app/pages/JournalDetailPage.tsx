@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, MapPin, Pencil } from 'lucide-react'
+import { ArrowLeft, MapPin, Pencil, Trash2 } from 'lucide-react'
 import L from 'leaflet'
 import { MapContainer, Marker, Polyline, TileLayer, Tooltip } from 'react-leaflet'
 
-import { editJournal, getJournalDetail, type JournalDetail, type JournalEntry } from '../services/journalApi'
+import { discardJournal, editJournal, getJournalDetail, type JournalDetail, type JournalEntry } from '../services/journalApi'
 import { humanizeTag } from '../utils/tags'
 import { absoluteImageUrl } from '../services/galleryApi'
 
@@ -54,6 +54,21 @@ export function JournalDetailPage() {
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const [savingTitle, setSavingTitle] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDeleteJournal = async () => {
+    if (!detail) return
+    const title = detail.title?.trim() || 'Untitled Journal'
+    if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return
+    setDeleting(true)
+    try {
+      await discardJournal(detail.id)
+      navigate('/journal/collections', { replace: true })
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to delete journal')
+      setDeleting(false)
+    }
+  }
 
   useEffect(() => {
     if (!journalId) return
@@ -187,16 +202,28 @@ export function JournalDetailPage() {
           )}
         </div>
 
-        <button
-          type="button"
-          className="button-secondary"
-          onClick={() => setShowMap(true)}
-          disabled={geotagged.length === 0}
-          title={geotagged.length === 0 ? 'No GPS coordinates to map' : 'View on map'}
-        >
-          <MapPin size={14} />
-          <span>View on map</span>
-        </button>
+        <div className="journal-diary-header-actions">
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={() => setShowMap(true)}
+            disabled={geotagged.length === 0}
+            title={geotagged.length === 0 ? 'No GPS coordinates to map' : 'View on map'}
+          >
+            <MapPin size={14} />
+            <span>View on map</span>
+          </button>
+          <button
+            type="button"
+            className="button-secondary collection-delete-btn"
+            onClick={() => void handleDeleteJournal()}
+            disabled={deleting}
+            title="Delete this journal"
+          >
+            <Trash2 size={14} />
+            <span>Delete</span>
+          </button>
+        </div>
       </header>
 
       {totalEntries === 0 ? (

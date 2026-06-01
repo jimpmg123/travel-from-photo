@@ -134,8 +134,8 @@ JWT_SECRET=change-this-in-production
 # JWT algorithm — leave as HS256
 JWT_ALGORITHM=HS256
 
-# Token expiry in minutes (e.g. 60 = 1 hour, 10080 = 7 days)
-JWT_EXPIRE_MINUTES=60
+# Token expiry in minutes (default 10080 = 7 days; use 60 for tighter sessions)
+JWT_EXPIRE_MINUTES=10080
 
 # Required for registration OTP emails.
 # EMAIL_FROM must be a Gmail address.

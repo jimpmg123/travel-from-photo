@@ -71,9 +71,17 @@ def _to_float(value) -> float | None:
         return None
 
 
-def _serialize(place: SavedPlace) -> SavedPlaceOut:
+def _serialize(place: SavedPlace, db: Session | None = None) -> SavedPlaceOut:
     lat = _to_float(place.latitude)
     lng = _to_float(place.longitude)
+    # Real EXIF GPS lives on image_metadata, NOT on saved_place.
+    # saved_place.latitude can be a search-resolved fallback even when the
+    # original photo had no GPS — so checking lat/lng here is misleading.
+    has_real_gps = False
+    if place.image_metadata_id is not None and db is not None:
+        meta_row = db.get(ImageMetadata, place.image_metadata_id)
+        if meta_row is not None:
+            has_real_gps = bool(meta_row.has_gps)
     return SavedPlaceOut(
         id=place.id,
         collection_name=place.collection_name,
@@ -85,7 +93,7 @@ def _serialize(place: SavedPlace) -> SavedPlaceOut:
         longitude=lng,
         image_url=place.image_url,
         image_metadata_id=place.image_metadata_id,
-        has_gps=lat is not None and lng is not None,
+        has_gps=has_real_gps,
         privacy=getattr(place, "privacy", "private"),
         created_at=place.created_at,
     )
@@ -114,9 +122,9 @@ def _create_image_metadata_from_saved_file(
     camera_info = meta.get("camera") or {}
     gps_info = meta.get("gps") or {}
 
-    lat = gps_info.get("latitude") if gps_info else fallback_lat
-    lng = gps_info.get("longitude") if gps_info else fallback_lng
-    has_gps = lat is not None and lng is not None
+    has_real_exif_gps = bool(gps_info.get("latitude") is not None and gps_info.get("longitude") is not None)
+    lat = gps_info.get("latitude") if has_real_exif_gps else fallback_lat
+    lng = gps_info.get("longitude") if has_real_exif_gps else fallback_lng
 
     row = ImageMetadata(
         user_id=user_id,
@@ -133,8 +141,8 @@ def _create_image_metadata_from_saved_file(
         lens_model=camera_info.get("lens_model"),
         latitude=lat,
         longitude=lng,
-        has_gps=bool(has_gps),
-        metadata_case="gps_present" if has_gps else "gps_missing",
+        has_gps=has_real_exif_gps,
+        metadata_case="gps_present" if has_real_exif_gps else "gps_missing",
         raw_metadata=meta,
     )
     db.add(row)
@@ -155,7 +163,7 @@ def list_collections(
     )
     grouped: dict[str, list[SavedPlaceOut]] = defaultdict(list)
     for row in rows:
-        grouped[row.collection_name].append(_serialize(row))
+        grouped[row.collection_name].append(_serialize(row, db))
     collections = [CollectionOut(name=name, saves=saves) for name, saves in grouped.items()]
     collections.sort(key=lambda c: c.name.lower())
     return CollectionsResponse(collections=collections)
@@ -221,7 +229,7 @@ async def create_saved_place(
     db.add(row)
     db.commit()
     db.refresh(row)
-    return _serialize(row)
+    return _serialize(row, db)
 
 
 @router.patch("/gallery/saves/{save_id}", response_model=SavedPlaceOut)
@@ -256,7 +264,7 @@ def update_saved_place(
 
     db.commit()
     db.refresh(row)
-    return _serialize(row)
+    return _serialize(row, db)
 
 
 @router.delete("/gallery/saves/{save_id}")

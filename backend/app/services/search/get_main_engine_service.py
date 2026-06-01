@@ -51,6 +51,7 @@ async def analyze_gpt_main_voter(
     ocr_text: str | None,
     exif_clues: dict[str, Any] | None,
     hints: SearchHintContext | None = None,
+    vision_labels: list[str] | None = None,
     timeout_sec: float = 10.0,
 ) -> list[dict[str, Any]]:
     path = Path(image_path)
@@ -62,23 +63,36 @@ async def analyze_gpt_main_voter(
     try:
         base64_image = _encode_image(path)
         hint_line = _format_hints(hints)
+        labels_line = ", ".join(vision_labels[:8]) if vision_labels else ""
         context_prompt = (
             f"OCR Extracted Text: {ocr_text or 'None'}\n"
             f"EXIF Location Clues: {json.dumps(exif_clues or {})}\n"
             f"User Hints (TRUST these heavily — the user actually visited the place): "
-            f"{hint_line or 'None'}"
+            f"{hint_line or 'None'}\n"
+            f"Visual content labels detected in the image (HARD CONSTRAINT — every candidate MUST "
+            f"be consistent with these visible features): {labels_line or 'None'}"
         )
 
         system_prompt = (
-            "You are an independent location voter. Analyze the image, OCR text, and EXIF clues. "
-            "Propose 2 to 3 specific place candidates. For each candidate, provide the place name, "
-            "a confidence score between 0.0 and 1.0, and your reasoning. "
+            "You are an independent location voter. Analyze the image, OCR text, EXIF clues, "
+            "and the visual content labels.\n\n"
+            "STEP 1: Look at the visual content labels first. They describe what is literally "
+            "visible in the image (e.g., 'Bridge', 'Mountain', 'Beach', 'Temple'). "
+            "Every candidate you propose MUST be consistent with these visible features. "
+            "If the labels say 'Bridge' or 'Suspension bridge', do NOT propose a mountain, "
+            "cape, or building — propose specific bridges. If the labels say 'Beach', do NOT "
+            "propose a temple. REJECT any candidate whose physical type contradicts the labels.\n\n"
+            "STEP 2: If user hints (country, city) are provided, narrow your candidates to that "
+            "region. Combined with STEP 1 this means: 'specific bridges in Jeju' not 'famous "
+            "places in Jeju'.\n\n"
+            "STEP 3: Propose 2 to 3 specific place candidates. For each, provide place_name, "
+            "score (0.0-1.0), and a reasoning that EXPLICITLY references the visual labels "
+            "and how the candidate matches them.\n\n"
             "Do not consider any external system verdicts. "
-            "IMPORTANT: If user hints are provided (country, city, freeform), STRONGLY prefer "
-            "candidates that match those hints. The user knows where they were — only deviate "
-            "from the hint when the image content blatantly contradicts it. "
             "Respond strictly in JSON format with a top-level 'candidates' array. "
-            "Example format: {\"candidates\": [{\"place_name\": \"...\", \"score\": 0.85, \"reasoning\": \"...\"}]}"
+            "Example: {\"candidates\": [{\"place_name\": \"Saeyeon Bridge\", \"score\": 0.8, "
+            "\"reasoning\": \"Labels show Bridge + Sea, hint Jeju — Saeyeon Bridge is a "
+            "well-known cable-stayed bridge in eastern Jeju.\"}]}"
         )
 
         client = _get_openai_client()

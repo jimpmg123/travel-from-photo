@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, BookText, Globe, Library, MapPin, PieChart as PieChartIcon, Sparkles, TrendingUp } from 'lucide-react'
 
 import {
+  discardJournal,
   getJournalRecommendations,
   getJournalStats,
   listJournals,
@@ -261,6 +262,21 @@ export function JournalCollectionsPage() {
   const [recs, setRecs] = useState<JournalRecommendations | null>(null)
   const [isLoadingRecs, setIsLoadingRecs] = useState(false)
   const [recsError, setRecsError] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+
+  const handleDeleteJournal = async (j: JournalSummary) => {
+    const title = j.title?.trim() || 'Untitled Journal'
+    if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return
+    setDeletingId(j.id)
+    try {
+      await discardJournal(j.id)
+      setJournals((current) => (current ?? []).filter((x) => x.id !== j.id))
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to delete journal')
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -347,33 +363,47 @@ export function JournalCollectionsPage() {
               ) : (
                 <section className="journal-collections-grid journal-collections-grid--big">
                   {journals.map((j) => (
-                    <button
-                      key={j.id}
-                      type="button"
-                      className="journal-collection-card"
-                      onClick={() => navigate(`/journal/collections/${j.id}`)}
-                    >
-                      {j.cover_image_url ? (
-                        <img
-                          className="journal-collection-card-cover"
-                          src={absoluteImageUrl(j.cover_image_url) ?? undefined}
-                          alt={j.title ?? 'Journal cover'}
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="journal-collection-card-strip" />
-                      )}
-                      <div className="journal-collection-card-body">
-                        <strong>{j.title?.trim() || 'Untitled Journal'}</strong>
-                        <span className="journal-collection-card-place">
-                          <MapPin size={12} />
-                          {[j.primary_city, j.primary_country].filter(Boolean).join(', ') || 'Unknown'}
-                        </span>
-                        <span className="journal-collection-card-meta">
-                          {formatDate(j.earliest_captured_at ?? j.created_at)} · {j.entry_count} entries
-                        </span>
-                      </div>
-                    </button>
+                    <div key={j.id} className="journal-collection-card-wrap">
+                      <button
+                        type="button"
+                        className="journal-collection-card"
+                        onClick={() => navigate(`/journal/collections/${j.id}`)}
+                      >
+                        {j.cover_image_url ? (
+                          <img
+                            className="journal-collection-card-cover"
+                            src={absoluteImageUrl(j.cover_image_url) ?? undefined}
+                            alt={j.title ?? 'Journal cover'}
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="journal-collection-card-strip" />
+                        )}
+                        <div className="journal-collection-card-body">
+                          <strong>{j.title?.trim() || 'Untitled Journal'}</strong>
+                          <span className="journal-collection-card-place">
+                            <MapPin size={12} />
+                            {[j.primary_city, j.primary_country].filter(Boolean).join(', ') || 'Unknown'}
+                          </span>
+                          <span className="journal-collection-card-meta">
+                            {formatDate(j.earliest_captured_at ?? j.created_at)} · {j.entry_count} entries
+                          </span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        className="journal-collection-delete"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void handleDeleteJournal(j)
+                        }}
+                        disabled={deletingId === j.id}
+                        aria-label={`Delete journal ${j.title ?? ''}`}
+                        title="Delete journal"
+                      >
+                        ×
+                      </button>
+                    </div>
                   ))}
                 </section>
               )}

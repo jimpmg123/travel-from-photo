@@ -191,6 +191,23 @@ def _has_web_exact_match(signals: list[dict[str, Any]]) -> bool:
     return False
 
 
+async def _extract_vision_labels(original_path: Path) -> list[str]:
+    """Pull visual content labels (Bridge, Mountain, Beach, etc.) so GPT
+    can be constrained to candidates matching what's actually in the image."""
+    try:
+        from app.services.shared.label_detection_service import analyze_label_detection
+        result = await asyncio.to_thread(analyze_label_detection, original_path, 10)
+        labels = result.get("labels") or []
+        return [
+            (label.get("description") or "").strip()
+            for label in labels
+            if (label.get("score") or 0) >= 0.6 and label.get("description")
+        ][:8]
+    except Exception as exc:
+        logger.warning(f"[Tier 2] Label detection failed (continuing without): {exc}")
+        return []
+
+
 async def _tier2_pipeline(
     original_path: Path,
     *,
@@ -199,8 +216,11 @@ async def _tier2_pipeline(
     exif_clues: dict[str, Any],
     prior_signals: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str]:
+    vision_labels = await _extract_vision_labels(original_path)
+    if vision_labels:
+        logger.info(f"[Tier 2] Visual labels for GPT constraint: {vision_labels}")
     main_result = await analyze_gpt_main_voter(
-        original_path, ocr_text, exif_clues, hints=hints
+        original_path, ocr_text, exif_clues, hints=hints, vision_labels=vision_labels
     )
     gpt_signals: list[dict[str, Any]] = []
     for item in main_result or []:

@@ -68,6 +68,7 @@ function toSearchImageResult(
       ocrTextUsed: false,
       candidates: [],
       verdict: 'failed',
+      tierReached: null,
       standardTags: [],
       chatLounges: [],
     }
@@ -91,6 +92,7 @@ function toSearchImageResult(
       ocrTextUsed: false,
       candidates: [],
       verdict: 'failed',
+      tierReached: null,
       standardTags: [],
       chatLounges: [],
     }
@@ -135,6 +137,7 @@ function toSearchImageResult(
   // "Top Match + Other Matches" per uploaded image.
   const candidates = analysis.response.candidates ?? []
   const verdict = analysis.response.verdict ?? null
+  const tierReached = analysis.response.tier_reached ?? null
   const standardTags = analysis.response.tags ?? []
   const chatLounges = analysis.response.chat_lounges ?? []
 
@@ -167,6 +170,7 @@ function toSearchImageResult(
       ocrTextUsed,
       candidates,
       verdict,
+      tierReached,
       standardTags,
       chatLounges,
     }
