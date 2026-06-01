@@ -202,6 +202,7 @@ function toSearchImageResult(
     verdict,
     standardTags,
     chatLounges,
+    tierReached,
   }
 }
 
