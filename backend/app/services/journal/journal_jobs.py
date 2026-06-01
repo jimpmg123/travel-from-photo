@@ -234,7 +234,7 @@ def _run_pipeline(db: Session, journal: Journal, image_ids: list[int]) -> None:
         if image.id in persisted_already:
             continue
 
-        if image.latitude is None or image.longitude is None or captured_at is None:
+        if image.latitude is None or image.longitude is None:
             skipped.append({"image_id": image.id, "reason": SKIP_REASON_NO_METADATA})
             continue
 
