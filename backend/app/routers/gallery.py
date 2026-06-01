@@ -174,11 +174,21 @@ async def create_saved_place(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    suffix = Path(image.filename or "").suffix or ".jpg"
-    saved_name = f"{uuid4().hex}{suffix}"
-    target_path = UPLOAD_DIR / saved_name
+    ALLOWED_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+    MAX_BYTES = 30 * 1024 * 1024
+
+    suffix = Path(image.filename or "").suffix.lower()
+    if suffix not in ALLOWED_SUFFIXES:
+        raise HTTPException(status_code=415, detail="Unsupported file type. Upload JPEG, PNG, or WebP.")
 
     contents = await image.read()
+    if len(contents) > MAX_BYTES:
+        raise HTTPException(status_code=413, detail="File too large. Maximum allowed size is 30 MB.")
+
+    safe_suffix = suffix if suffix != ".jpeg" else ".jpg"
+    saved_name = f"{uuid4().hex}{safe_suffix}"
+    target_path = UPLOAD_DIR / saved_name
+
     with open(target_path, "wb") as buf:
         buf.write(contents)
 

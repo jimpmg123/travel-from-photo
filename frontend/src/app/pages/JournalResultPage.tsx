@@ -61,6 +61,7 @@ export function JournalResultPage() {
   const [editingEntryId, setEditingEntryId] = useState<number | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [showSavedDialog, setShowSavedDialog] = useState(false)
+  const [currentIndex, setCurrentIndex] = useState(0)
 
   // Fetch the journal once on mount (or when id changes).
   useEffect(() => {
@@ -152,6 +153,12 @@ export function JournalResultPage() {
   }
 
   const entries = detail.entries
+  const total = entries.length
+  const entry = entries[currentIndex]
+  const tags = collectTags(entry)
+  const value = entryTextById[entry.id] ?? ''
+  const isEditing = editingEntryId === entry.id
+  const isLast = currentIndex === total - 1
 
   return (
     <div className="journal-result-shell">
@@ -193,88 +200,104 @@ export function JournalResultPage() {
         </div>
       </header>
 
-      <section className="journal-result-entries">
-        {entries.map((entry, index) => {
-          const isLast = index === entries.length - 1
-          const tags = collectTags(entry)
-          const value = entryTextById[entry.id] ?? ''
-          const isEditing = editingEntryId === entry.id
+      <section className="journal-diary-stage">
+        <button
+          type="button"
+          className="journal-diary-arrow journal-diary-arrow--left"
+          onClick={() => { setCurrentIndex((i) => Math.max(0, i - 1)); setEditingEntryId(null) }}
+          disabled={currentIndex === 0}
+          aria-label="Previous entry"
+        >
+          ‹
+        </button>
 
-          return (
-            <article key={entry.id} className="journal-result-entry">
-              {entry.image_url ? (
-                <img
-                  className="journal-result-photo"
-                  src={absoluteImageUrl(entry.image_url) ?? undefined}
-                  alt={`Photo ${index + 1}`}
-                  loading="lazy"
-                />
-              ) : (
-                <div className="journal-result-photo photo-frame photo-frame--coast" />
-              )}
+        <article className="journal-result-entry">
+          <div className="journal-diary-card-top">
+            <span className="journal-diary-card-counter">{currentIndex + 1} / {total}</span>
+            <span className="journal-diary-card-location">
+              <MapPin size={13} />
+              {[entry.place_name, entry.city, entry.country].filter(Boolean).join(' · ') || 'Unknown place'}
+            </span>
+          </div>
 
-              <div className="journal-result-content">
-                <div className="journal-result-location">
-                  <MapPin size={14} />
-                  <span>
-                    {[entry.place_name, entry.city, entry.country].filter(Boolean).join(' · ') || 'Unknown place'}
-                  </span>
-                </div>
+          {entry.image_url ? (
+            <img
+              className="journal-result-photo"
+              src={absoluteImageUrl(entry.image_url) ?? undefined}
+              alt={`Photo ${currentIndex + 1}`}
+            />
+          ) : (
+            <div className="journal-result-photo photo-frame photo-frame--coast" />
+          )}
 
-                {tags.length > 0 && (
-                  <div className="journal-result-tags">
-                    {tags.map((tag) => (
-                      <span key={tag} className="journal-result-tag">{humanizeTag(tag)}</span>
-                    ))}
-                  </div>
-                )}
-
-                {isEditing ? (
-                  <textarea
-                    className="journal-result-text-input"
-                    value={value}
-                    autoFocus
-                    onChange={(e) =>
-                      setEntryTextById((current) => ({ ...current, [entry.id]: e.target.value }))
-                    }
-                    onBlur={() => setEditingEntryId(null)}
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    className="journal-result-text"
-                    onClick={() => setEditingEntryId(entry.id)}
-                  >
-                    {value || <em>Add a note…</em>}
-                  </button>
-                )}
-
-                {isLast && (
-                  <div className="journal-result-final-actions">
-                    <button
-                      type="button"
-                      className="button-secondary"
-                      onClick={handleDiscard}
-                    >
-                      <Trash2 size={14} />
-                      <span>Discard</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="button-primary"
-                      onClick={handleSave}
-                      disabled={isSaving}
-                    >
-                      <Save size={14} />
-                      <span>{isSaving ? 'Saving…' : 'Save to Collections'}</span>
-                    </button>
-                  </div>
-                )}
+          <div className="journal-result-content">
+            {tags.length > 0 && (
+              <div className="journal-result-tags">
+                {tags.map((tag) => (
+                  <span key={tag} className="journal-result-tag">{humanizeTag(tag)}</span>
+                ))}
               </div>
-            </article>
-          )
-        })}
+            )}
+
+            {isEditing ? (
+              <textarea
+                className="journal-result-text-input"
+                value={value}
+                autoFocus
+                onChange={(e) =>
+                  setEntryTextById((current) => ({ ...current, [entry.id]: e.target.value }))
+                }
+                onBlur={() => setEditingEntryId(null)}
+              />
+            ) : (
+              <button
+                type="button"
+                className="journal-result-text"
+                onClick={() => setEditingEntryId(entry.id)}
+              >
+                {value || <em>Add a note…</em>}
+              </button>
+            )}
+
+            {isLast && (
+              <div className="journal-result-final-actions">
+                <button type="button" className="button-secondary" onClick={handleDiscard}>
+                  <Trash2 size={14} />
+                  <span>Discard</span>
+                </button>
+                <button type="button" className="button-primary" onClick={handleSave} disabled={isSaving}>
+                  <Save size={14} />
+                  <span>{isSaving ? 'Saving…' : 'Save to Collections'}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </article>
+
+        <button
+          type="button"
+          className="journal-diary-arrow journal-diary-arrow--right"
+          onClick={() => { setCurrentIndex((i) => Math.min(total - 1, i + 1)); setEditingEntryId(null) }}
+          disabled={currentIndex === total - 1}
+          aria-label="Next entry"
+        >
+          ›
+        </button>
       </section>
+
+      {total > 1 && (
+        <div className="journal-diary-dots">
+          {entries.map((_, idx) => (
+            <button
+              key={idx}
+              type="button"
+              className={`journal-diary-dot${idx === currentIndex ? ' is-active' : ''}`}
+              onClick={() => { setCurrentIndex(idx); setEditingEntryId(null) }}
+              aria-label={`Go to entry ${idx + 1}`}
+            />
+          ))}
+        </div>
+      )}
 
       {showSavedDialog && (
         <div className="journal-saved-overlay" onClick={() => setShowSavedDialog(false)}>
