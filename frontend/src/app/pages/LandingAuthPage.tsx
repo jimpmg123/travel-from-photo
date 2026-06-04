@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { apiRegister, apiVerifyOtp } from '../services/authApi'
@@ -92,8 +92,8 @@ export function LandingAuthPage() {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
-      <div style={leftPanel}>
+    <div className="landing-shell">
+      <div className="landing-left" style={{ background: '#0f172a', color: 'white' }}>
         <div style={{ marginBottom: '56px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
             <div style={{ width: '6px', height: '44px', background: TEAL, borderRadius: '3px', flexShrink: 0 }} />
@@ -126,7 +126,7 @@ export function LandingAuthPage() {
         </div>
       </div>
 
-      <div style={rightPanel}>
+      <div className="landing-right" style={{ background: '#f0fdfa' }}>
         <div style={{ width: '100%', maxWidth: '400px' }}>
           {view === 'login' && (
             <>
@@ -387,24 +387,6 @@ function Anchor({ children, onClick }: { children: React.ReactNode; onClick: () 
   )
 }
 
-const leftPanel: CSSProperties = {
-  flex: 1,
-  background: '#0f172a',
-  color: 'white',
-  padding: '64px 56px',
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'center',
-}
-
-const rightPanel: CSSProperties = {
-  flex: 1,
-  background: '#f0fdfa',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '64px 56px',
-}
 
 const heading: CSSProperties = {
   fontSize: '26px',

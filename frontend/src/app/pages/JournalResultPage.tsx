@@ -62,6 +62,7 @@ export function JournalResultPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [showSavedDialog, setShowSavedDialog] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [tagsOpen, setTagsOpen] = useState(false)
 
   // Fetch the journal once on mount (or when id changes).
   useEffect(() => {
@@ -204,7 +205,7 @@ export function JournalResultPage() {
         <button
           type="button"
           className="journal-diary-arrow journal-diary-arrow--left"
-          onClick={() => { setCurrentIndex((i) => Math.max(0, i - 1)); setEditingEntryId(null) }}
+          onClick={() => { setCurrentIndex((i) => Math.max(0, i - 1)); setEditingEntryId(null); setTagsOpen(false) }}
           disabled={currentIndex === 0}
           aria-label="Previous entry"
         >
@@ -218,7 +219,24 @@ export function JournalResultPage() {
               <MapPin size={13} />
               {[entry.place_name, entry.city, entry.country].filter(Boolean).join(' · ') || 'Unknown place'}
             </span>
+            {tags.length > 0 && (
+              <button
+                type="button"
+                className="journal-tags-toggle"
+                onClick={() => setTagsOpen((v) => !v)}
+              >
+                {tagsOpen ? '✕ Tags' : '🏷 Tags'}
+              </button>
+            )}
           </div>
+
+          {tags.length > 0 && (
+            <div className={`journal-tags-panel${tagsOpen ? ' is-open' : ''}`}>
+              {tags.map((tag) => (
+                <span key={tag} className="journal-result-tag">{humanizeTag(tag)}</span>
+              ))}
+            </div>
+          )}
 
           {entry.image_url ? (
             <img
@@ -277,7 +295,7 @@ export function JournalResultPage() {
         <button
           type="button"
           className="journal-diary-arrow journal-diary-arrow--right"
-          onClick={() => { setCurrentIndex((i) => Math.min(total - 1, i + 1)); setEditingEntryId(null) }}
+          onClick={() => { setCurrentIndex((i) => Math.min(total - 1, i + 1)); setEditingEntryId(null); setTagsOpen(false) }}
           disabled={currentIndex === total - 1}
           aria-label="Next entry"
         >
@@ -292,7 +310,7 @@ export function JournalResultPage() {
               key={idx}
               type="button"
               className={`journal-diary-dot${idx === currentIndex ? ' is-active' : ''}`}
-              onClick={() => { setCurrentIndex(idx); setEditingEntryId(null) }}
+              onClick={() => { setCurrentIndex(idx); setEditingEntryId(null); setTagsOpen(false) }}
               aria-label={`Go to entry ${idx + 1}`}
             />
           ))}

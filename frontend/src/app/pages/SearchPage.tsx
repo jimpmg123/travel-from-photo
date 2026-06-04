@@ -63,7 +63,7 @@ export function SearchPage({ onStartSearch, isSearching }: SearchPageProps) {
       <section className="search-hero-shell">
         <div className="search-hero-copy">
           <h1 className="search-page-title">Search</h1>
-          <p className="search-page-subtitle">
+          <p className="search-page-subtitle search-subtitle-hide-mobile">
             Upload a travel photo and we'll identify where it was taken — landmarks,
             shops, streets — using a fusion of vision APIs and AI reasoning.
           </p>

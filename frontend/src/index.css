@@ -185,4 +185,93 @@ p {
   [data-theme="system"] .field textarea { background: var(--paper-deep); color: var(--ink); border-color: var(--line); }
   [data-theme="system"] .topbar,
   [data-theme="system"] .desktop-side-nav { background: var(--paper-deep); border-color: var(--line); }
+  [data-theme="system"] .search-entry-card--hero,
+  [data-theme="system"] .upload-list-item,
+  [data-theme="system"] .upload-zone--hero,
+  [data-theme="system"] .search-image-block,
+  [data-theme="system"] .top-match-card,
+  [data-theme="system"] .journal-result-entry,
+  [data-theme="system"] .journal-diary-card { background: var(--paper-deep); color: var(--ink); border-color: var(--line); }
+  [data-theme="system"] .button-secondary { background: var(--paper-deep) !important; border-color: var(--line) !important; color: var(--ink) !important; }
+}
+
+/* ── Extended dark mode coverage (explicit dark) ── */
+[data-theme="dark"] .search-entry-card--hero,
+[data-theme="dark"] .upload-list-item,
+[data-theme="dark"] .upload-zone--hero {
+  background: var(--paper-deep);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .search-image-block,
+[data-theme="dark"] .top-match-card,
+[data-theme="dark"] .alternate-card,
+[data-theme="dark"] .carousel-arrow,
+[data-theme="dark"] .match-map-edit-toggle,
+[data-theme="dark"] .match-name-input,
+[data-theme="dark"] .diagnostics-panel,
+[data-theme="dark"] .research-panel,
+[data-theme="dark"] .research-bar {
+  background: var(--paper-deep);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .journal-result-entry,
+[data-theme="dark"] .journal-diary-card,
+[data-theme="dark"] .journal-diary-arrow,
+[data-theme="dark"] .journal-tags-panel {
+  background: var(--paper-deep);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .journal-saved-modal,
+[data-theme="dark"] .save-dialog,
+[data-theme="dark"] .gallery-collection-card,
+[data-theme="dark"] .journal-collection-card {
+  background: var(--paper-deep);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+[data-theme="dark"] .gallery-collection-meta h3,
+[data-theme="dark"] .gallery-collection-meta p,
+[data-theme="dark"] .alternate-card-name,
+[data-theme="dark"] .alternate-card-location {
+  color: var(--ink);
+}
+
+[data-theme="dark"] .button-secondary {
+  background: var(--paper-deep) !important;
+  border-color: var(--line) !important;
+  color: var(--ink) !important;
+}
+
+[data-theme="dark"] .topbar-chip,
+[data-theme="dark"] .topbar-profile {
+  background: var(--paper-deep);
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+[data-theme="dark"] .join-lounge-chip,
+[data-theme="dark"] .lounge-emoji {
+  background: var(--paper-deep);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .match-photo,
+[data-theme="dark"] .search-modal-body,
+[data-theme="dark"] .save-dialog-body {
+  background: var(--paper-deep);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .tag-chip,
+[data-theme="dark"] .journal-result-tag {
+  background: rgba(91, 158, 201, 0.15);
+  color: var(--accent);
 }

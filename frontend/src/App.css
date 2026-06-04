@@ -7069,3 +7069,175 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE OVERHAUL  (mobile-only — desktop unchanged)
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Landing page layout ── */
+.landing-shell {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+}
+.landing-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 64px 56px;
+}
+.landing-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 56px;
+}
+
+/* ── Alternates toggle (desktop: always open, no UI) ── */
+.alternates-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: default;
+  text-align: left;
+}
+.alternates-toggle-chevron { display: none; }
+
+/* ── Chat back button (desktop: hidden) ── */
+.chat-back-btn { display: none; }
+
+/* ── Journal tags panel (desktop: hidden toggle, show in content) ── */
+.journal-tags-toggle { display: none; }
+.journal-tags-panel { display: none; }
+
+/* ═══════════════════════
+   Mobile  ≤ 760px
+   ═══════════════════════ */
+@media (max-width: 760px) {
+
+  /* -- Landing: hide feature panel, form takes full screen -- */
+  .landing-left { display: none; }
+  .landing-right {
+    min-height: 100svh;
+    padding: 36px 24px;
+    align-items: center;
+  }
+
+  /* -- Search page: hide subtitle, compact upload zone -- */
+  .search-subtitle-hide-mobile { display: none; }
+  .search-hint-note { font-size: 0.78rem; }
+  .upload-zone--hero {
+    min-height: 110px;
+    padding: 14px 16px;
+  }
+  .upload-zone--hero strong { font-size: 1.05rem; }
+  .upload-zone--hero p { font-size: 0.82rem; }
+  .upload-list-item { padding: 8px 10px; }
+  .upload-list-item-main {
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 10px;
+  }
+  .upload-list-item-thumb { width: 44px; height: 44px; }
+  .upload-list-item-copy strong { font-size: 0.88rem; }
+  .search-entry-card--hero { gap: 12px; padding: 14px; }
+
+  /* -- Search results: hide section heading text on mobile -- */
+  .results-heading-text { display: none; }
+  .results-subheading { display: none; }
+  .results-heading {
+    border-bottom: none;
+    padding-bottom: 0;
+    gap: 0;
+  }
+  .results-heading-side { width: 100%; }
+
+  /* -- Alternates: collapsible on mobile -- */
+  .alternates-toggle-btn { cursor: pointer; }
+  .alternates-toggle-chevron { display: inline; }
+  .alternates-grid:not(.is-open) { display: none; }
+
+  /* -- Chat: mobile view switching (sidebar ↔ chat panel) -- */
+  .chat-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 3px;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .chat-layout[data-mobile-view="chat"] .chat-sidebar--lounges { display: none; }
+  .chat-layout[data-mobile-view="lounges"] .chat-panel { display: none; }
+
+  /* -- Journal result: compact photo, tags toggle -- */
+  .journal-result-photo { height: 210px; }
+  .journal-result-content { padding: 14px 16px 18px; gap: 12px; }
+  .journal-result-content .journal-result-tags { display: none; }
+  .journal-result-shell { gap: 14px; }
+  .journal-result-header { gap: 10px; }
+  .journal-result-title-button,
+  .journal-result-title-input { font-size: 1.4rem; }
+
+  /* Card top: prevent counter from breaking */
+  .journal-diary-card-top {
+    padding: 10px 14px 8px;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+  .journal-diary-card-counter {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .journal-diary-card-location {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Tags toggle button (top-right of card-top) */
+  .journal-tags-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(26, 73, 96, 0.25);
+    background: rgba(26, 73, 96, 0.08);
+    color: var(--accent);
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  /* Tags panel: slides open between card-top and photo */
+  .journal-tags-panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    overflow: hidden;
+    max-height: 0;
+    padding: 0 14px;
+    background: rgba(255, 253, 246, 0.95);
+    transition: max-height 220ms ease, padding 200ms ease;
+  }
+  .journal-tags-panel.is-open {
+    max-height: 160px;
+    padding: 10px 14px 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  }
+}

@@ -200,6 +200,7 @@ function toSearchImageResult(
     ocrTextUsed,
     candidates,
     verdict,
+    tierReached,
     standardTags,
     chatLounges,
   }
