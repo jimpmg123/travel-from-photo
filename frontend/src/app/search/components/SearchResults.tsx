@@ -445,6 +445,7 @@ function ImageResultBlock({
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
   const [isMapEditable, setIsMapEditable] = useState(false)
+  const [altOpen, setAltOpen] = useState(false)
   const navigate = useNavigate()
 
   const startNameEdit = () => {
@@ -592,8 +593,11 @@ function ImageResultBlock({
 
           {alternates.length > 0 ? (
             <div className="alternates-section">
-              <h4 className="alternates-section-heading">Other matches</h4>
-              <div className="alternates-grid">
+              <button type="button" className="alternates-toggle-btn" onClick={() => setAltOpen((v) => !v)}>
+                <h4 className="alternates-section-heading">Other matches ({alternates.length})</h4>
+                <span className="alternates-toggle-chevron">{altOpen ? '▾' : '▸'}</span>
+              </button>
+              <div className={`alternates-grid${altOpen ? ' is-open' : ''}`}>
                 {alternates.map((alt) => {
                   const altMap = mapEmbedUrl(alt, 14)
                   return (
@@ -854,12 +858,12 @@ export function SearchResults({
   return (
     <section className="panel content-panel search-results-shell">
       <section className="section-heading results-heading">
-        <div>
+        <div className="results-heading-text">
           <p className="eyebrow">Search Results</p>
           <h2>{bundle.heading}</h2>
         </div>
         <div className="results-heading-side">
-          <p className="section-copy">{bundle.subheading}</p>
+          <p className="section-copy results-subheading">{bundle.subheading}</p>
           {bundle.results.length > 0 ? (
             <button
               type="button"

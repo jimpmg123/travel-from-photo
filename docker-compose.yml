@@ -24,19 +24,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    env_file:
+      - ./backend/.env
     environment:
+      # These override anything in backend/.env because environment wins over env_file.
+      # DATABASE_URL must use 'db' (the compose service name), not localhost.
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-travel_user}:${POSTGRES_PASSWORD:-travel_password}@db:5432/${POSTGRES_DB:-travel_db}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_VISION_MODEL: ${OPENAI_VISION_MODEL:-gpt-4.1-mini}
-      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
-      GOOGLE_CLOUD_VISION_API_KEY: ${GOOGLE_CLOUD_VISION_API_KEY:-}
-      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
-      VISUAL_CROSSING_API_KEY: ${VISUAL_CROSSING_API_KEY:-}
-      JWT_SECRET: ${JWT_SECRET:-change-this-to-a-strong-random-secret}
-      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
-      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-10080}
-      EMAIL_FROM: ${EMAIL_FROM:-}
-      EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
       SEED_DB_ON_START: ${SEED_DB_ON_START:-false}
     volumes:
       - uploads_data:/app/uploads

@@ -51,6 +51,7 @@ export function ChatPage() {
   const [galleryImages, setGalleryImages] = useState<SavedPlace[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
   const [attachment, setAttachment] = useState<{ imageUrl: string } | null>(null)
+  const [mobileView, setMobileView] = useState<'lounges' | 'chat'>('lounges')
 
   const activeRoom = rooms.find((room) => room.id === activeRoomId) ?? null
 
@@ -186,7 +187,7 @@ export function ChatPage() {
         </p>
       </section>
 
-      <section className="chat-layout panel">
+      <section className="chat-layout panel" data-mobile-view={mobileView}>
         <aside className="chat-sidebar chat-sidebar--lounges">
           <div className="chat-sidebar-head">
             <h3>13 Lounges</h3>
@@ -206,7 +207,7 @@ export function ChatPage() {
                   key={room.id}
                   className={`chat-room lounge-room${room.id === activeRoomId ? ' is-active' : ''}${roomMatchesTags(room, recommendedTags) ? ' is-recommended' : ''}`}
                   type="button"
-                  onClick={() => setActiveRoomId(room.id)}
+                  onClick={() => { setActiveRoomId(room.id); setMobileView('chat') }}
                 >
                   <span className="lounge-emoji">{room.emoji}</span>
                   <span>
@@ -221,6 +222,9 @@ export function ChatPage() {
 
         <article className="chat-panel">
           <div className="chat-header">
+            <button type="button" className="chat-back-btn" onClick={() => setMobileView('lounges')}>
+              ← Lounges
+            </button>
             <div>
               <strong>{activeRoom ? `${activeRoom.emoji} ${activeRoom.displayName}` : 'Select a lounge'}</strong>
               {activeRoom ? <p className="field-note">{activeRoom.description}</p> : null}
