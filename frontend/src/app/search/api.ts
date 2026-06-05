@@ -248,6 +248,7 @@ export async function analyzeSearchUploads(
   hints: {
     countryHint: string
     cityHint: string
+    userHint?: string
   },
 ): Promise<SearchUploadAnalysis[]> {
   const tasks = uploads.map((upload) => analyzeSingleUpload(upload, hints))

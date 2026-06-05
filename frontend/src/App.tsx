@@ -43,8 +43,7 @@ function App() {
 
   const handleStartSearch = (input: {
     uploads: SearchUploadItem[]
-    countryHint: string
-    cityHint: string
+    hint: string
   }) => {
     if (searchInFlight) return
     setSearchInFlight(true)
@@ -52,18 +51,17 @@ function App() {
     ;(async () => {
       try {
         const analyses = await analyzeSearchUploads(input.uploads, {
-          countryHint: input.countryHint,
-          cityHint: input.cityHint,
+          countryHint: '',
+          cityHint: '',
+          userHint: input.hint,
         })
         const bundle = buildSearchResultBundle({
-          countryHint: input.countryHint,
-          cityHint: input.cityHint,
+          hint: input.hint,
           uploads: input.uploads,
           analyses,
         })
         setLatestSearchSession({
-          countryHint: input.countryHint,
-          cityHint: input.cityHint,
+          hint: input.hint,
           uploads: input.uploads,
           analyses,
           bundle,
@@ -107,8 +105,7 @@ function App() {
       ...latestSearchSession,
       analyses: nextAnalyses,
       bundle: buildSearchResultBundle({
-        countryHint: latestSearchSession.countryHint,
-        cityHint: latestSearchSession.cityHint,
+        hint: latestSearchSession.hint,
         uploads: latestSearchSession.uploads,
         analyses: nextAnalyses,
       }),

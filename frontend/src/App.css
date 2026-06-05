@@ -906,10 +906,10 @@
 }
 
 .search-hero-shell {
-  width: min(100%, 460px);
+  width: min(100%, 600px);
   display: grid;
   justify-items: center;
-  gap: 22px;
+  gap: 20px;
 }
 
 .search-hero-copy {
@@ -937,9 +937,9 @@
 }
 
 .search-entry-card--hero {
-  width: min(100%, 410px);
-  gap: 18px;
-  padding: 20px;
+  width: 100%;
+  gap: 16px;
+  padding: 20px 22px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 18px 32px rgba(15, 23, 42, 0.08);
@@ -7068,6 +7068,94 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ── Search page hero title accent ── */
+.search-page-title {
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-weight: 700;
+  font-family: var(--display-font);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin: 0;
+  color: var(--ink);
+  text-align: center;
+}
+
+.search-page-title-accent {
+  color: var(--accent);
+  font-style: italic;
+}
+
+/* ── Tip note: stronger visibility ── */
+.search-hint-note {
+  background: rgba(26, 73, 96, 0.1);
+  border-color: rgba(26, 73, 96, 0.28);
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
+.search-hint-note strong {
+  color: var(--accent);
+}
+
+/* ── Free-text hint field ── */
+.search-hint-field {
+  display: grid;
+  gap: 6px;
+}
+
+.search-hint-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.search-hint-label-text {
+  color: var(--accent);
+}
+
+.search-hint-label-opt {
+  font-weight: 400;
+  opacity: 0.6;
+  letter-spacing: 0;
+  font-family: var(--display-font);
+}
+
+.search-hint-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 5px;
+  border: 1px solid rgba(71, 49, 24, 0.14);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  resize: none;
+  font-family: var(--display-font);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+
+.search-hint-textarea:focus {
+  outline: none;
+  border-color: rgba(26, 73, 96, 0.4);
+  box-shadow: 0 0 0 3px rgba(26, 73, 96, 0.08);
+}
+
+.search-hint-textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+/* ── Upload zone: remove bottom margin when inside compact card ── */
+.search-entry-card--hero .upload-zone--hero {
+  margin-bottom: 0;
 }
 
 /* ═══════════════════════════════════════════════════════════

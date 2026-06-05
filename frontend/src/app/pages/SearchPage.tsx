@@ -6,8 +6,7 @@ import type { SearchPageProps, SearchUploadItem } from '../search/types'
 import { getUploadValidationError } from '../search/utils'
 
 export function SearchPage({ onStartSearch, isSearching }: SearchPageProps) {
-  const [countryHint, setCountryHint] = useState('')
-  const [cityHint, setCityHint] = useState('')
+  const [hint, setHint] = useState('')
   const [uploads, setUploads] = useState<SearchUploadItem[]>([])
   const [uploadError, setUploadError] = useState('')
 
@@ -52,8 +51,7 @@ export function SearchPage({ onStartSearch, isSearching }: SearchPageProps) {
     setUploadError('')
     onStartSearch({
       uploads,
-      countryHint: countryHint.trim(),
-      cityHint: cityHint.trim(),
+      hint: hint.trim(),
     })
   }
 
@@ -62,10 +60,14 @@ export function SearchPage({ onStartSearch, isSearching }: SearchPageProps) {
       {isSearching ? <SearchLoadingOverlay /> : null}
       <section className="search-hero-shell">
         <div className="search-hero-copy">
-          <h1 className="search-page-title">Search</h1>
+          <h1 className="search-page-title">
+            Show us a photo.
+            <br />
+            <span className="search-page-title-accent">We'll find where you've been.</span>
+          </h1>
           <p className="search-page-subtitle search-subtitle-hide-mobile">
-            Upload a travel photo and we'll identify where it was taken — landmarks,
-            shops, streets — using a fusion of vision APIs and AI reasoning.
+            Upload any travel photo — we pinpoint the location using landmark detection,
+            visual AI, and GPS metadata. Then we help you build a travel journal.
           </p>
         </div>
 
@@ -77,8 +79,7 @@ export function SearchPage({ onStartSearch, isSearching }: SearchPageProps) {
               <line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
             <span>
-              <strong>Tip:</strong> add a country or city hint, and upload multiple
-              photos from the same trip — both noticeably improve accuracy.
+              <strong>Tip:</strong> uploading multiple photos from the same trip noticeably improves accuracy.
             </span>
           </p>
 
@@ -119,25 +120,19 @@ export function SearchPage({ onStartSearch, isSearching }: SearchPageProps) {
             </div>
           ) : null}
 
-          <div className="field-grid search-hint-grid">
-            <label className="field">
-              <span>Country</span>
-              <input
-                type="text"
-                value={countryHint}
-                onChange={(event) => setCountryHint(event.target.value)}
-                placeholder="Japan"
-              />
+          <div className="search-hint-field">
+            <label className="search-hint-label" htmlFor="search-hint-input">
+              <span className="search-hint-label-text">// Hint for AI</span>
+              <span className="search-hint-label-opt">optional</span>
             </label>
-            <label className="field">
-              <span>City</span>
-              <input
-                type="text"
-                value={cityHint}
-                onChange={(event) => setCityHint(event.target.value)}
-                placeholder="Kyoto"
-              />
-            </label>
+            <textarea
+              id="search-hint-input"
+              className="search-hint-textarea"
+              value={hint}
+              onChange={(event) => setHint(event.target.value)}
+              placeholder="e.g. Shot in Japan in summer 2023, near a canal in Amsterdam, café district..."
+              rows={2}
+            />
           </div>
 
           {uploadError ? <p className="field-error">{uploadError}</p> : null}

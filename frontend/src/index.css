@@ -198,7 +198,8 @@ p {
 /* ── Extended dark mode coverage (explicit dark) ── */
 [data-theme="dark"] .search-entry-card--hero,
 [data-theme="dark"] .upload-list-item,
-[data-theme="dark"] .upload-zone--hero {
+[data-theme="dark"] .upload-zone--hero,
+[data-theme="dark"] .search-hint-textarea {
   background: var(--paper-deep);
   border-color: var(--line);
   color: var(--ink);

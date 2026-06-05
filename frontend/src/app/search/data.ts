@@ -207,18 +207,17 @@ function toSearchImageResult(
 }
 
 export function buildSearchResultBundle(params: {
-  countryHint: string
-  cityHint: string
+  hint: string
   uploads: SearchUploadItem[]
   analyses: SearchUploadAnalysis[]
 }): SearchResultBundle {
-  const { analyses, countryHint, uploads } = params
+  const { analyses, uploads } = params
 
   const results = uploads.map((upload) =>
     toSearchImageResult(
       upload,
       analyses.find((analysis) => analysis.uploadId === upload.id),
-      countryHint,
+      '',
     ),
   )
 

@@ -93,8 +93,7 @@ export type SearchUploadAnalysis =
     }
 
 export type SearchRun = {
-  countryHint: string
-  cityHint: string
+  hint: string
   uploads: SearchUploadItem[]
   analyses: SearchUploadAnalysis[]
   bundle: SearchResultBundle
@@ -145,8 +144,7 @@ export type SearchResultBundle = {
 export type SearchPageProps = {
   onStartSearch: (input: {
     uploads: SearchUploadItem[]
-    countryHint: string
-    cityHint: string
+    hint: string
   }) => void
   isSearching: boolean
 }
