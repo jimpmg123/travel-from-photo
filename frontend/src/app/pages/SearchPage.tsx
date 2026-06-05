@@ -58,6 +58,48 @@ export function SearchPage({ onStartSearch, isSearching }: SearchPageProps) {
   return (
     <div className="search-main-shell search-main-shell--hero">
       {isSearching ? <SearchLoadingOverlay /> : null}
+
+      {/* Polaroid wall decoration — desktop only, aria-hidden */}
+      <div className="polaroid-scene" aria-hidden="true">
+        <svg
+          className="polaroid-strings"
+          viewBox="0 0 1400 700"
+          preserveAspectRatio="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {/* Horizontal catenary wire across the full width */}
+          <path
+            d="M 0,148 Q 350,118 700,112 Q 1050,118 1400,148"
+            stroke="#8a7a62"
+            strokeWidth="1.6"
+            fill="none"
+            opacity="0.55"
+          />
+          {/* Clip contact points on the wire */}
+          <circle cx="214" cy="130" r="3.5" fill="#8a7a62" opacity="0.5" />
+          <circle cx="388" cy="119" r="3.5" fill="#8a7a62" opacity="0.5" />
+          <circle cx="1012" cy="119" r="3.5" fill="#8a7a62" opacity="0.5" />
+          <circle cx="1186" cy="130" r="3.5" fill="#8a7a62" opacity="0.5" />
+        </svg>
+
+        <div className="polaroid polaroid--left-far">
+          <div className="polaroid-photo polaroid-photo--city" />
+          <p className="polaroid-caption">night city</p>
+        </div>
+        <div className="polaroid polaroid--left-near">
+          <div className="polaroid-photo polaroid-photo--ocean" />
+          <p className="polaroid-caption">santorini</p>
+        </div>
+        <div className="polaroid polaroid--right-near">
+          <div className="polaroid-photo polaroid-photo--mountain" />
+          <p className="polaroid-caption">kyoto</p>
+        </div>
+        <div className="polaroid polaroid--right-far">
+          <div className="polaroid-photo polaroid-photo--sunset" />
+          <p className="polaroid-caption">golden hour</p>
+        </div>
+      </div>
+
       <section className="search-hero-shell">
         <div className="search-hero-copy">
           <h1 className="search-page-title">
