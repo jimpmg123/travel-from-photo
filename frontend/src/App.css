@@ -7071,51 +7071,21 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   POLAROID WALL  — dark hero background + decorative frames
+   POLAROID WALL  — decorative frames flanking the search card
    ═══════════════════════════════════════════════════════════ */
 
-/* Dark wall for the hero section — cool charcoal with subtle dot grid */
+/* position: relative so the polaroid-scene can be absolute inside */
 .search-main-shell--hero {
   position: relative;
-  border-radius: 10px;
-  overflow: hidden;
-  background:
-    radial-gradient(circle, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
-    radial-gradient(ellipse at 50% -8%, rgba(80, 120, 200, 0.07) 0%, transparent 55%),
-    radial-gradient(ellipse at 15% 85%, rgba(60, 80, 140, 0.05) 0%, transparent 45%),
-    #14161d;
-  background-size: 36px 36px, 100% 100%, 100% 100%, 100% 100%;
 }
 
-/* Hero copy text: warm white on dark bg */
-.search-main-shell--hero .search-hero-copy {
-  text-align: center;
-}
-.search-main-shell--hero .search-page-title {
-  color: rgba(252, 243, 220, 0.96);
-}
-.search-main-shell--hero .search-page-title-accent {
-  color: #7ec8e3;
-}
-.search-main-shell--hero .search-page-subtitle {
-  color: rgba(252, 243, 220, 0.58);
-}
-
-/* Card: stronger shadow floating on dark bg */
-.search-main-shell--hero .search-entry-card--hero {
-  box-shadow:
-    0 4px 8px rgba(0, 0, 0, 0.25),
-    0 16px 48px rgba(0, 0, 0, 0.55),
-    0 0 0 1px rgba(200, 155, 65, 0.2);
-}
-
-/* Keep hero shell above polaroid layer */
+/* Card sits above the wire + polaroid layer */
 .search-hero-shell {
   position: relative;
   z-index: 2;
 }
 
-/* ── Polaroid scene layer ── */
+/* Polaroid scene: full overlay, non-interactive */
 .polaroid-scene {
   position: absolute;
   inset: 0;
@@ -7123,39 +7093,40 @@
   z-index: 1;
 }
 
+/* SVG string overlay — absolute fill */
 .polaroid-strings {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+  pointer-events: none;
 }
 
-/* ── Polaroid frame base ── */
+/* ── Polaroid frame ── */
 .polaroid {
   position: absolute;
-  background: #fdf9f0;
-  padding: 14px 8px 28px;
+  background: #fdfaf3;
+  padding: 12px 8px 26px;
   box-shadow:
-    2px 6px 20px rgba(0, 0, 0, 0.58),
-    0 2px 4px rgba(0, 0, 0, 0.3),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.75);
+    2px 6px 18px rgba(0, 0, 0, 0.22),
+    0 2px 5px rgba(0, 0, 0, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.6);
 }
 
-/* Wooden clip */
+/* Wooden clip at top */
 .polaroid::before {
   content: '';
   position: absolute;
-  top: 4px;
+  top: 3px;
   left: 50%;
   transform: translateX(-50%);
-  width: 20px;
-  height: 11px;
-  background: linear-gradient(
-    155deg,
+  width: 18px;
+  height: 10px;
+  background: linear-gradient(155deg,
     #7a4f2a 0%, #9b6535 32%, #c4813a 50%, #9b6535 68%, #7a4f2a 100%
   );
-  border-radius: 3px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .polaroid-photo {
@@ -7170,12 +7141,12 @@
   font-size: 9px;
   color: #5a4a3a;
   font-style: italic;
-  letter-spacing: 0.06em;
-  opacity: 0.7;
+  letter-spacing: 0.05em;
+  opacity: 0.65;
   font-family: Georgia, serif;
 }
 
-/* ── Photo backgrounds — flat hard-cut bands, not smooth gradients ── */
+/* ── Photo backgrounds — flat hard-cut bands ── */
 .polaroid-photo--sunset {
   background: linear-gradient(to bottom,
     #e07845 0% 30%,
@@ -7203,59 +7174,50 @@
 .polaroid-photo--city {
   background:
     radial-gradient(1.5px 2.5px at 18% 58%, rgba(255, 232, 100, 0.92) 0%, transparent 100%),
-    radial-gradient(1.5px 2.5px at 28% 64%, rgba(255, 218, 78, 0.88) 0%, transparent 100%),
-    radial-gradient(1.5px 2.5px at 38% 52%, rgba(255, 228, 95, 0.90) 0%, transparent 100%),
-    radial-gradient(1.5px 2.5px at 52% 60%, rgba(255, 210, 60, 0.85) 0%, transparent 100%),
-    radial-gradient(1.5px 2.5px at 65% 55%, rgba(255, 225, 88, 0.90) 0%, transparent 100%),
-    radial-gradient(1.5px 2.5px at 74% 68%, rgba(255, 218, 75, 0.87) 0%, transparent 100%),
+    radial-gradient(1.5px 2.5px at 30% 65%, rgba(255, 218, 78, 0.88) 0%, transparent 100%),
+    radial-gradient(1.5px 2.5px at 42% 52%, rgba(255, 228, 95, 0.90) 0%, transparent 100%),
+    radial-gradient(1.5px 2.5px at 56% 60%, rgba(255, 210, 60, 0.85) 0%, transparent 100%),
+    radial-gradient(1.5px 2.5px at 68% 55%, rgba(255, 225, 88, 0.90) 0%, transparent 100%),
+    radial-gradient(1.5px 2.5px at 78% 68%, rgba(255, 218, 75, 0.87) 0%, transparent 100%),
     radial-gradient(1.5px 2.5px at 82% 58%, rgba(255, 230, 95, 0.88) 0%, transparent 100%),
-    radial-gradient(1.5px 2.5px at 44% 72%, rgba(255, 200, 55, 0.82) 0%, transparent 100%),
-    radial-gradient(1.5px 2.5px at 58% 75%, rgba(255, 215, 65, 0.80) 0%, transparent 100%),
     linear-gradient(to bottom, #0d1220 0% 58%, #07090f 58% 100%);
 }
 
-/* ── Individual polaroid positions — hang from horizontal wire ── */
+/* ── Polaroid positions: original first-design layout ── */
 .polaroid--left-near {
   width: 148px;
-  top: 20%;
-  right: calc(50% + 308px);
-  transform: perspective(700px) rotateZ(-5deg) rotateY(4deg);
-  opacity: 0.95;
+  top: 50%;
+  right: calc(50% + 316px);
+  transform: translateY(-52%) perspective(700px) rotateZ(-7deg) rotateY(6deg);
+  opacity: 0.92;
 }
 .polaroid--left-far {
-  width: 108px;
-  top: 16%;
-  right: calc(50% + 490px);
-  transform: perspective(1000px) rotateZ(-13deg) rotateY(18deg);
-  opacity: 0.62;
-  filter: blur(0.6px);
+  width: 106px;
+  top: 33%;
+  right: calc(50% + 502px);
+  transform: translateY(-50%) perspective(950px) rotateZ(-17deg) rotateY(20deg);
+  opacity: 0.65;
+  filter: blur(0.5px);
 }
 .polaroid--right-near {
   width: 148px;
-  top: 20%;
-  left: calc(50% + 308px);
-  transform: perspective(700px) rotateZ(5deg) rotateY(-4deg);
-  opacity: 0.95;
+  top: 50%;
+  left: calc(50% + 316px);
+  transform: translateY(-52%) perspective(700px) rotateZ(7deg) rotateY(-6deg);
+  opacity: 0.92;
 }
 .polaroid--right-far {
-  width: 108px;
-  top: 16%;
-  left: calc(50% + 490px);
-  transform: perspective(1000px) rotateZ(13deg) rotateY(-18deg);
-  opacity: 0.62;
-  filter: blur(0.6px);
+  width: 106px;
+  top: 33%;
+  left: calc(50% + 502px);
+  transform: translateY(-50%) perspective(950px) rotateZ(17deg) rotateY(-20deg);
+  opacity: 0.65;
+  filter: blur(0.5px);
 }
 
-/* Hide polaroids on viewports too narrow to show them */
+/* Hide when viewport too narrow */
 @media (max-width: 1100px) {
   .polaroid-scene { display: none; }
-}
-
-/* Remove border-radius at mobile */
-@media (max-width: 900px) {
-  .search-main-shell--hero {
-    border-radius: 0;
-  }
 }
 
 /* ── Search page hero title accent ── */

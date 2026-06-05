@@ -67,19 +67,15 @@ export function SearchPage({ onStartSearch, isSearching }: SearchPageProps) {
           preserveAspectRatio="none"
           xmlns="http://www.w3.org/2000/svg"
         >
-          {/* Horizontal catenary wire across the full width */}
-          <path
-            d="M 0,148 Q 350,118 700,112 Q 1050,118 1400,148"
-            stroke="#8a7a62"
-            strokeWidth="1.6"
-            fill="none"
-            opacity="0.55"
-          />
-          {/* Clip contact points on the wire */}
-          <circle cx="214" cy="130" r="3.5" fill="#8a7a62" opacity="0.5" />
-          <circle cx="388" cy="119" r="3.5" fill="#8a7a62" opacity="0.5" />
-          <circle cx="1012" cy="119" r="3.5" fill="#8a7a62" opacity="0.5" />
-          <circle cx="1186" cy="130" r="3.5" fill="#8a7a62" opacity="0.5" />
+          <circle cx="700" cy="22" r="5" fill="#A07840" opacity="0.65" />
+          <path d="M 700,22 Q 430,92 158,168" stroke="#A07840" strokeWidth="1.4" fill="none" opacity="0.45" />
+          <path d="M 700,22 Q 530,144 320,256" stroke="#A07840" strokeWidth="1.4" fill="none" opacity="0.45" />
+          <path d="M 700,22 Q 870,144 1080,256" stroke="#A07840" strokeWidth="1.4" fill="none" opacity="0.45" />
+          <path d="M 700,22 Q 970,92 1242,168" stroke="#A07840" strokeWidth="1.4" fill="none" opacity="0.45" />
+          <circle cx="158" cy="168" r="3" fill="#A07840" opacity="0.5" />
+          <circle cx="320" cy="256" r="3" fill="#A07840" opacity="0.5" />
+          <circle cx="1080" cy="256" r="3" fill="#A07840" opacity="0.5" />
+          <circle cx="1242" cy="168" r="3" fill="#A07840" opacity="0.5" />
         </svg>
 
         <div className="polaroid polaroid--left-far">
