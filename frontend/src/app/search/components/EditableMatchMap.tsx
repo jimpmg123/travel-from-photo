@@ -36,6 +36,27 @@ function RecenterOnChange({ lat, lng }: { lat: number; lng: number }) {
   return null
 }
 
+function ScrollZoomOnHover({ editable }: { editable: boolean }) {
+  const map = useMap()
+  useEffect(() => {
+    if (editable) {
+      map.scrollWheelZoom.enable()
+      return
+    }
+    const container = map.getContainer()
+    const enable = () => map.scrollWheelZoom.enable()
+    const disable = () => map.scrollWheelZoom.disable()
+    map.scrollWheelZoom.disable()
+    container.addEventListener('mouseenter', enable)
+    container.addEventListener('mouseleave', disable)
+    return () => {
+      container.removeEventListener('mouseenter', enable)
+      container.removeEventListener('mouseleave', disable)
+    }
+  }, [map, editable])
+  return null
+}
+
 function ClickHandler({ onClick }: { onClick: (lat: number, lng: number) => void }) {
   useMapEvents({
     click(e) {
@@ -108,12 +129,13 @@ export function EditableMatchMap({ latitude, longitude, placeName, editable, onP
         center={[latitude, longitude]}
         zoom={15}
         style={{ width: '100%', height: '100%' }}
-        scrollWheelZoom={editable}
+        scrollWheelZoom={false}
       >
         <TileLayer
           attribution="&copy; OpenStreetMap contributors"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        <ScrollZoomOnHover editable={editable} />
         <RecenterOnChange lat={latitude} lng={longitude} />
         {editable ? <ClickHandler onClick={(lat, lng) => void handlePick(lat, lng)} /> : null}
         <Marker

@@ -73,6 +73,13 @@ async def analyze_gpt_main_voter(
             f"be consistent with these visible features): {labels_line or 'None'}"
         )
 
+        language_instruction = ""
+        if hints and hints.language and hints.language != "en":
+            lang_name = hints.language_name()
+            language_instruction = (
+                f"\n\nLANGUAGE: Write all place_name and reasoning values in {lang_name}."
+            )
+
         system_prompt = (
             "You are an independent location voter. Analyze the image, OCR text, EXIF clues, "
             "and the visual content labels.\n\n"
@@ -93,6 +100,7 @@ async def analyze_gpt_main_voter(
             "Example: {\"candidates\": [{\"place_name\": \"Saeyeon Bridge\", \"score\": 0.8, "
             "\"reasoning\": \"Labels show Bridge + Sea, hint Jeju — Saeyeon Bridge is a "
             "well-known cable-stayed bridge in eastern Jeju.\"}]}"
+            + language_instruction
         )
 
         client = _get_openai_client()

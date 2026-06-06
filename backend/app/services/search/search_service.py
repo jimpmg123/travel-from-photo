@@ -313,6 +313,7 @@ async def analyze_uploaded_search_image(
     country_hint: str | None = None,
     city_hint: str | None = None,
     user_hint: str | None = None,
+    language: str = "en",
     force_openai_retry: bool = False,  # cascade-era no-op kept for compat
     db: Session | None = None,         # accepted for callers that pass it
 ) -> SearchImageAnalysis:
@@ -334,7 +335,7 @@ async def analyze_uploaded_search_image(
     del force_openai_retry, db  # not used in fusion flow
 
     suffix = Path(file.filename or "upload.bin").suffix
-    hints = SearchHintContext(country_hint=country_hint, city_hint=city_hint, user_hint=user_hint)
+    hints = SearchHintContext(country_hint=country_hint, city_hint=city_hint, user_hint=user_hint, language=language)
 
     upload_path: Path | None = None
     processed_path: Path | None = None

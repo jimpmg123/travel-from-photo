@@ -18,6 +18,7 @@ import { ProfilePage } from './app/pages/ProfilePage'
 import { SearchPage } from './app/pages/SearchPage'
 import { SearchResultsPage } from './app/pages/SearchResultsPage'
 import { SettingsPage } from './app/pages/SettingsPage'
+import { useLanguage } from './app/context/LanguageContext'
 import { analyzeSearchUploads, applyCrossImageClusterReweight, retryFailedSearchUpload } from './app/search/api'
 import { buildSearchResultBundle } from './app/search/data'
 import type { SearchRun, SearchUploadItem } from './app/search/types'
@@ -26,6 +27,7 @@ function App() {
   const navigate = useNavigate()
   const location = useLocation()
   const { isLoggedIn, role, logout } = useAuth()
+  const { language } = useLanguage()
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -54,6 +56,7 @@ function App() {
           countryHint: '',
           cityHint: '',
           userHint: input.hint,
+          language,
         })
         const bundle = buildSearchResultBundle({
           hint: input.hint,
@@ -91,8 +94,8 @@ function App() {
     if (!targetUpload) return
 
     const nextAnalysis = await retryFailedSearchUpload(targetUpload, {
-      countryHint: latestSearchSession.countryHint,
-      cityHint: latestSearchSession.cityHint,
+      countryHint: '',
+      cityHint: '',
       userHint,
     })
 

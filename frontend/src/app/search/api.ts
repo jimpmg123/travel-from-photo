@@ -13,10 +13,11 @@ async function analyzeSingleUpload(
     countryHint: string
     cityHint: string
     userHint?: string
+    language?: string
     forceOpenaiRetry?: boolean
   },
 ): Promise<SearchUploadAnalysis> {
-  const { cityHint, countryHint, forceOpenaiRetry, userHint } = hints
+  const { cityHint, countryHint, forceOpenaiRetry, language, userHint } = hints
   const formData = new FormData()
   formData.append('file', upload.file)
 
@@ -28,6 +29,9 @@ async function analyzeSingleUpload(
   }
   if (userHint?.trim()) {
     formData.append('user_hint', userHint.trim())
+  }
+  if (language) {
+    formData.append('language', language)
   }
   if (forceOpenaiRetry) {
     formData.append('force_openai_retry', 'true')
@@ -249,6 +253,7 @@ export async function analyzeSearchUploads(
     countryHint: string
     cityHint: string
     userHint?: string
+    language?: string
   },
 ): Promise<SearchUploadAnalysis[]> {
   const tasks = uploads.map((upload) => analyzeSingleUpload(upload, hints))

@@ -33,19 +33,19 @@ def _is_eligible(signal: dict[str, Any]) -> bool:
     return has_coords or has_text
 
 
-def _resolve_one_signal_sync(signal: dict[str, Any]) -> dict[str, Any] | None:
+def _resolve_one_signal_sync(signal: dict[str, Any], language_code: str = "en") -> dict[str, Any] | None:
     """Network call: resolve one signal to a canonical place via
     Places/Geocoding. Returns a 'mini-candidate' dict or None on failure."""
     try:
         lat = signal.get("parsed_latitude")
         lng = signal.get("parsed_longitude")
         if lat is not None and lng is not None:
-            geo = reverse_geocode_coordinates(float(lat), float(lng))
+            geo = reverse_geocode_coordinates(float(lat), float(lng), language_code=language_code)
         else:
             text = (signal.get("parsed_place_name") or "").strip()
             if len(text) < 3:
                 return None
-            geo = geocode_address(text)
+            geo = geocode_address(text, language_code=language_code)
     except Exception:
         return None
 
@@ -191,13 +191,13 @@ async def normalize_signals_to_candidates(
 
     Returns a list of candidate dicts (no ranks yet — scoring assigns those).
     """
-    del hints  # used in scoring/reweighting, not here
+    language_code = hints.google_language_code()
 
     eligible = [s for s in signals if _is_eligible(s)]
     if not eligible:
         return []
 
-    tasks = [asyncio.to_thread(_resolve_one_signal_sync, s) for s in eligible]
+    tasks = [asyncio.to_thread(_resolve_one_signal_sync, s, language_code) for s in eligible]
     results = await asyncio.gather(*tasks)
     minis = [r for r in results if r is not None]
     if not minis:

@@ -5,16 +5,19 @@ import 'leaflet/dist/leaflet.css'
 import './index.css'
 import { AuthProvider } from './app/context/AuthContext'
 import { JournalJobProvider } from './app/context/JournalJobContext'
+import { LanguageProvider } from './app/context/LanguageContext'
 import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <AuthProvider>
-        <JournalJobProvider>
-          <App />
-        </JournalJobProvider>
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <JournalJobProvider>
+            <App />
+          </JournalJobProvider>
+        </AuthProvider>
+      </LanguageProvider>
     </BrowserRouter>
   </StrictMode>,
 )

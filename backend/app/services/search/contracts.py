@@ -4,11 +4,24 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 
+GOOGLE_LANGUAGE_CODES: dict[str, str] = {
+    "ko": "ko", "en": "en", "ja": "ja", "zh": "zh-CN",
+    "es": "es", "fr": "fr", "de": "de", "pt": "pt", "it": "it", "ru": "ru",
+}
+
+LANGUAGE_NAMES: dict[str, str] = {
+    "ko": "Korean", "en": "English", "ja": "Japanese", "zh": "Chinese",
+    "es": "Spanish", "fr": "French", "de": "German", "pt": "Portuguese",
+    "it": "Italian", "ru": "Russian",
+}
+
+
 @dataclass(slots=True)
 class SearchHintContext:
     country_hint: str | None = None
     city_hint: str | None = None
     user_hint: str | None = None
+    language: str = "en"
 
     def normalized_country(self) -> str | None:
         value = (self.country_hint or "").strip()
@@ -21,6 +34,12 @@ class SearchHintContext:
     def normalized_user_hint(self) -> str | None:
         value = (self.user_hint or "").strip()
         return value or None
+
+    def google_language_code(self) -> str:
+        return GOOGLE_LANGUAGE_CODES.get(self.language, "en")
+
+    def language_name(self) -> str:
+        return LANGUAGE_NAMES.get(self.language, "English")
 
 
 @dataclass(slots=True)

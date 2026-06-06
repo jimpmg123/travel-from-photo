@@ -1,0 +1,16 @@
+# Force LF line endings for shell scripts (Docker / EC2 / Ubuntu run them).
+# Without this, Windows CRLF endings cause "env: 'sh\r': No such file" errors.
+*.sh text eol=lf
+backend/start.sh text eol=lf
+
+# Other text formats default to repo's normal handling.
+*.py text
+*.ts text
+*.tsx text
+*.js text
+*.json text
+*.md text
+*.yml text
+*.yaml text
+*.toml text
+*.ini text

@@ -17,6 +17,7 @@ async def upload_image(
     country_hint: str | None = Form(default=None),
     city_hint: str | None = Form(default=None),
     user_hint: str | None = Form(default=None),
+    language: str | None = Form(default=None),
     force_openai_retry: bool = Form(default=False),
 ):
     suffix = Path(file.filename or "").suffix.lower()
@@ -33,6 +34,7 @@ async def upload_image(
         country_hint=country_hint,
         city_hint=city_hint,
         user_hint=user_hint,
+        language=language or "en",
         force_openai_retry=force_openai_retry,
     )
     payload = analysis.to_dict()

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   BookText,
   Camera,
+  Globe,
   Image as ImageIcon,
   type LucideIcon,
   Menu,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react'
 
 import { useAuth } from '../context/AuthContext'
+import { LANGUAGE_OPTIONS, useLanguage } from '../context/LanguageContext'
 import { navItems } from '../data'
 
 const navPath: Record<string, string> = {
@@ -56,8 +58,21 @@ export function TopBar({ onLogout }: TopBarProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const { isLoggedIn, role, userDisplayName } = useAuth()
+  const { language, languageLabel, setLanguage } = useLanguage()
   const activeNavId = getActiveNavId(location.pathname)
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
+  const [langOpen, setLangOpen] = useState(false)
+  const langRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (langRef.current && !langRef.current.contains(e.target as Node)) {
+        setLangOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   useEffect(() => {
     setIsMobileNavOpen(false)
@@ -106,10 +121,37 @@ export function TopBar({ onLogout }: TopBarProps) {
         </nav>
 
         <div className="topbar-tools">
+          {/* Language picker */}
+          <div className="lang-picker" ref={langRef}>
+            <button
+              type="button"
+              className="lang-globe-btn"
+              onClick={() => setLangOpen((v) => !v)}
+              title="Select language"
+              aria-label="Select language"
+            >
+              <Globe size={15} />
+              <span>{languageLabel}</span>
+            </button>
+            {langOpen && (
+              <div className="lang-dropdown">
+                {LANGUAGE_OPTIONS.map(({ code, label }) => (
+                  <button
+                    key={code}
+                    type="button"
+                    className={`lang-option${language === code ? ' is-active' : ''}`}
+                    onClick={() => { setLanguage(code); setLangOpen(false) }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {isLoggedIn ? (
             <>
               {role === 'admin' && <span className="topbar-chip">Admin</span>}
-              <span className="topbar-username">{userDisplayName}</span>
               <button
                 type="button"
                 className="topbar-chip topbar-chip--accent"
