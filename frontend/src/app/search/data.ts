@@ -203,7 +203,6 @@ function toSearchImageResult(
     tierReached,
     standardTags,
     chatLounges,
-    tierReached,
   }
 }
 
